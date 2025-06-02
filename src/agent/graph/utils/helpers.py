@@ -3,10 +3,10 @@ import re
 from langchain_core.output_parsers import StrOutputParser
 from langchain_groq import ChatGroq
 
-from joi.modules.image.image_to_text import ImageToText
-from joi.modules.image.text_to_image import TextToImage
-from joi.modules.speech import TextToSpeech
-from joi.settings import settings
+from agent.modules.image.image_to_text import ImageToText
+from agent.modules.image.text_to_image import TextToImage
+from agent.modules.speech import TextToSpeech
+from agent.settings import settings
 
 
 def get_chat_model(temperature: float = 0.7):

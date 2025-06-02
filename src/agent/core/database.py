@@ -5,7 +5,7 @@ import os
 import asyncio
 from functools import lru_cache
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from joi.settings import settings
+from agent.settings import settings
 
 # Global flag to track if setup has been done
 _setup_done = False

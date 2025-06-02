@@ -4,7 +4,7 @@ from datetime import datetime
 from functools import lru_cache
 from typing import List, Optional
 
-from joi.settings import settings
+from agent.settings import settings
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
 from sentence_transformers import SentenceTransformer

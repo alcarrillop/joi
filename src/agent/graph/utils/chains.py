@@ -1,8 +1,8 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from pydantic import BaseModel, Field
 
-from joi.core.prompts import CHARACTER_CARD_PROMPT, ROUTER_PROMPT
-from joi.graph.utils.helpers import AsteriskRemovalParser, get_chat_model
+from agent.core.prompts import CHARACTER_CARD_PROMPT, ROUTER_PROMPT
+from agent.graph.utils.helpers import AsteriskRemovalParser, get_chat_model
 
 
 class RouterResponse(BaseModel):

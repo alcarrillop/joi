@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Dict, Optional
 
-from joi.core.schedules import (
+from agent.core.schedules import (
     FRIDAY_SCHEDULE,
     MONDAY_SCHEDULE,
     SATURDAY_SCHEDULE,

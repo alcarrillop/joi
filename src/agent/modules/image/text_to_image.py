@@ -3,9 +3,9 @@ import logging
 import os
 from typing import Optional
 
-from joi.core.exceptions import TextToImageError
-from joi.core.prompts import IMAGE_ENHANCEMENT_PROMPT, IMAGE_SCENARIO_PROMPT
-from joi.settings import settings
+from agent.core.exceptions import TextToImageError
+from agent.core.prompts import IMAGE_ENHANCEMENT_PROMPT, IMAGE_SCENARIO_PROMPT
+from agent.settings import settings
 from langchain.prompts import PromptTemplate
 from langchain_groq import ChatGroq
 from pydantic import BaseModel, Field

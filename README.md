@@ -56,7 +56,7 @@
 
 4. **Run the service**
    ```bash
-   uvicorn src.joi.interfaces.whatsapp.webhook_endpoint:app --host 0.0.0.0 --port 8000 --reload
+   uvicorn src.agent.interfaces.whatsapp.webhook_endpoint:app --host 0.0.0.0 --port 8000 --reload
    ```
 
 5. **Configure WhatsApp webhook**
@@ -70,7 +70,7 @@
 ### Core Components
 
 ```
-src/joi/
+src/agent/
 ├── core/
 │   ├── database.py          # PostgreSQL checkpointer setup
 │   ├── prompts.py          # AI conversation prompts
@@ -139,7 +139,7 @@ WHATSAPP_VERIFY_TOKEN=your_verify_token
 ### For Developers
 
 1. **Extend functionality** by adding new nodes to the LangGraph workflow
-2. **Customize prompts** in `src/joi/core/prompts.py`
+2. **Customize prompts** in `src/agent/core/prompts.py`
 3. **Add new languages** by modifying the conversation logic
 4. **Deploy to production** using Docker and Cloud Run
 
@@ -149,7 +149,7 @@ WHATSAPP_VERIFY_TOKEN=your_verify_token
 
 ### Local Development
 ```bash
-uvicorn src.joi.interfaces.whatsapp.webhook_endpoint:app --reload
+uvicorn src.agent.interfaces.whatsapp.webhook_endpoint:app --reload
 ```
 
 ### Production Deployment

@@ -1,8 +1,8 @@
 from langgraph.graph import END
 from typing_extensions import Literal
 
-from joi.graph.state import AICompanionState
-from joi.settings import settings
+from agent.graph.state import AICompanionState
+from agent.settings import settings
 
 
 def should_summarize_conversation(

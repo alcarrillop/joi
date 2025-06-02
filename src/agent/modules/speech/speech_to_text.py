@@ -2,8 +2,8 @@ import os
 import tempfile
 from typing import Optional
 
-from joi.core.exceptions import SpeechToTextError
-from joi.settings import settings
+from agent.core.exceptions import SpeechToTextError
+from agent.settings import settings
 from groq import Groq
 
 

@@ -8,11 +8,11 @@ from fastapi import APIRouter, Request, Response
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-from joi.graph import graph_builder
-from joi.modules.image import ImageToText
-from joi.modules.speech import SpeechToText, TextToSpeech
-from joi.settings import settings
-from joi.core.database import get_checkpointer
+from agent.graph import graph_builder
+from agent.modules.image import ImageToText
+from agent.modules.speech import SpeechToText, TextToSpeech
+from agent.settings import settings
+from agent.core.database import get_checkpointer
 
 logger = logging.getLogger(__name__)
 

@@ -2,11 +2,11 @@ from functools import lru_cache
 
 from langgraph.graph import END, START, StateGraph
 
-from joi.graph.edges import (
+from agent.graph.edges import (
     select_workflow,
     should_summarize_conversation,
 )
-from joi.graph.nodes import (
+from agent.graph.nodes import (
     audio_node,
     context_injection_node,
     conversation_node,
@@ -16,7 +16,7 @@ from joi.graph.nodes import (
     router_node,
     summarize_conversation_node,
 )
-from joi.graph.state import AICompanionState
+from agent.graph.state import AICompanionState
 
 
 @lru_cache(maxsize=1)

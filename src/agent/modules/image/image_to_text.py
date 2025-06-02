@@ -3,8 +3,8 @@ import logging
 import os
 from typing import Optional, Union
 
-from joi.core.exceptions import ImageToTextError
-from joi.settings import settings
+from agent.core.exceptions import ImageToTextError
+from agent.settings import settings
 from groq import Groq
 
 

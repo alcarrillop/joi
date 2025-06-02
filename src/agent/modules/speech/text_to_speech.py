@@ -1,8 +1,8 @@
 import os
 from typing import Optional
 
-from joi.core.exceptions import TextToSpeechError
-from joi.settings import settings
+from agent.core.exceptions import TextToSpeechError
+from agent.settings import settings
 from elevenlabs import ElevenLabs, Voice, VoiceSettings
 
 

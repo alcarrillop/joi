@@ -4,19 +4,19 @@ from uuid import uuid4
 from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage
 from langchain_core.runnables import RunnableConfig
 
-from joi.graph.state import AICompanionState
-from joi.graph.utils.chains import (
+from agent.graph.state import AICompanionState
+from agent.graph.utils.chains import (
     get_character_response_chain,
     get_router_chain,
 )
-from joi.graph.utils.helpers import (
+from agent.graph.utils.helpers import (
     get_chat_model,
     get_text_to_image_module,
     get_text_to_speech_module,
 )
-from joi.modules.memory.long_term.memory_manager import get_memory_manager
-from joi.modules.schedules.context_generation import ScheduleContextGenerator
-from joi.settings import settings
+from agent.modules.memory.long_term.memory_manager import get_memory_manager
+from agent.modules.schedules.context_generation import ScheduleContextGenerator
+from agent.settings import settings
 
 
 async def router_node(state: AICompanionState):

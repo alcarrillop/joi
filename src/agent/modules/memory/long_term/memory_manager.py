@@ -3,9 +3,9 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from joi.core.prompts import MEMORY_ANALYSIS_PROMPT
-from joi.modules.memory.long_term.vector_store import get_vector_store
-from joi.settings import settings
+from agent.core.prompts import MEMORY_ANALYSIS_PROMPT
+from agent.modules.memory.long_term.vector_store import get_vector_store
+from agent.settings import settings
 from langchain_core.messages import BaseMessage
 from langchain_groq import ChatGroq
 from pydantic import BaseModel, Field
