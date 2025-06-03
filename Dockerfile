@@ -57,12 +57,12 @@ COPY --chown=appuser:appuser scripts/ ./scripts/
 ENV VIRTUAL_ENV=/app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
-# Expose port (Railway will set PORT env var)
-EXPOSE ${PORT:-8000}
+# Expose port
+EXPOSE 8000
 
-# Health check for Railway
+# Health check for Railway (using PORT env var at runtime)
 HEALTHCHECK --interval=30s --timeout=30s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:${PORT:-8000}/debug/health || exit 1
 
 # Run the application (Railway compatible)
-CMD ["sh", "-c", "fastapi run src/agent/interfaces/whatsapp/webhook_endpoint.py --port ${PORT:-8000} --host 0.0.0.0 --workers 1"]
+CMD ["sh", "-c", "uvicorn src.agent.interfaces.whatsapp.webhook_endpoint:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
