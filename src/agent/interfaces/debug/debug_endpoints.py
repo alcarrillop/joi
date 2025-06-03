@@ -23,7 +23,6 @@ class UserInfo(BaseModel):
     id: str
     phone_number: str
     name: Optional[str]
-    current_level: str
     created_at: datetime
 
 
@@ -31,8 +30,6 @@ class SessionInfo(BaseModel):
     id: str
     user_id: str
     started_at: datetime
-    ended_at: Optional[datetime]
-    context: Optional[Dict]
 
 
 class MessageInfo(BaseModel):
@@ -69,7 +66,7 @@ async def get_system_stats():
         total_users = await conn.fetchval("SELECT COUNT(*) FROM users")
         total_sessions = await conn.fetchval("SELECT COUNT(*) FROM sessions")
         total_messages = await conn.fetchval("SELECT COUNT(*) FROM messages")
-        active_sessions = await conn.fetchval("SELECT COUNT(*) FROM sessions WHERE ended_at IS NULL")
+        active_sessions = total_sessions  # All sessions are considered active now
         total_learning_stats = await conn.fetchval("SELECT COUNT(*) FROM learning_stats")
 
         # Memory statistics
@@ -104,7 +101,7 @@ async def get_all_users(limit: int = Query(50, ge=1, le=100)):
 
     try:
         users = await conn.fetch(
-            "SELECT id, phone_number, name, current_level, created_at FROM users ORDER BY created_at DESC LIMIT $1",
+            "SELECT id, phone_number, name, created_at FROM users ORDER BY created_at DESC LIMIT $1",
             limit,
         )
 
@@ -113,7 +110,6 @@ async def get_all_users(limit: int = Query(50, ge=1, le=100)):
                 id=str(user["id"]),
                 phone_number=user["phone_number"],
                 name=user["name"],
-                current_level=user["current_level"],
                 created_at=user["created_at"],
             )
             for user in users
@@ -130,7 +126,7 @@ async def get_user_sessions(user_id: str):
 
     try:
         sessions = await conn.fetch(
-            "SELECT id, user_id, started_at, ended_at, context FROM sessions WHERE user_id = $1 ORDER BY started_at DESC",
+            "SELECT id, user_id, started_at FROM sessions WHERE user_id = $1 ORDER BY started_at DESC",
             uuid.UUID(user_id),
         )
 
@@ -139,8 +135,6 @@ async def get_user_sessions(user_id: str):
                 id=str(session["id"]),
                 user_id=str(session["user_id"]),
                 started_at=session["started_at"],
-                ended_at=session["ended_at"],
-                context=session["context"],
             )
             for session in sessions
         ]

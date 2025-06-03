@@ -4,16 +4,20 @@ Database configuration for PostgreSQL checkpointer with automatic setup
 
 import asyncio
 import json
+import logging
 import os
 import uuid
 from functools import lru_cache
 from pathlib import Path
+from typing import Dict
 
 import asyncpg
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 # Global flag to track if setup has been done
 _setup_done = False
+
+logger = logging.getLogger(__name__)
 
 
 @lru_cache
@@ -122,9 +126,9 @@ async def get_or_create_session(user_id: str) -> str:
     conn = await asyncpg.connect(database_url)
 
     try:
-        # Try to find active session (ended_at is NULL)
+        # Try to find the most recent session for the user
         session = await conn.fetchrow(
-            "SELECT id FROM sessions WHERE user_id = $1 AND ended_at IS NULL", uuid.UUID(user_id)
+            "SELECT id FROM sessions WHERE user_id = $1 ORDER BY started_at DESC LIMIT 1", uuid.UUID(user_id)
         )
 
         if session:
@@ -158,29 +162,32 @@ async def log_message(session_id: str, sender: str, message: str):
         await conn.close()
 
 
-async def get_user_learning_stats(user_id: str) -> dict:
-    """Get learning statistics for a user."""
+async def get_user_stats(user_id: str) -> Dict:
+    """Get user learning statistics."""
     database_url = get_database_url()
     conn = await asyncpg.connect(database_url)
 
     try:
+        # Get learning stats from learning_stats table
         stats = await conn.fetchrow(
-            """SELECT u.current_level, ls.vocab_learned, ls.grammar_issues
-               FROM users u
-               LEFT JOIN learning_stats ls ON u.id = ls.user_id
-               WHERE u.id = $1""",
+            """SELECT ls.vocab_learned, ls.grammar_issues
+            FROM learning_stats ls
+            WHERE ls.user_id = $1""",
             uuid.UUID(user_id),
         )
 
         if stats:
             return {
-                "current_level": stats["current_level"] or "A1",
                 "vocab_learned": stats["vocab_learned"] or [],
                 "grammar_issues": stats["grammar_issues"] or {},
             }
 
-        return {"current_level": "A1", "vocab_learned": [], "grammar_issues": {}}
+        # Return default if no stats found
+        return {"vocab_learned": [], "grammar_issues": {}}
 
+    except Exception as e:
+        logger.error(f"Error getting user stats: {e}")
+        return {"vocab_learned": [], "grammar_issues": {}}
     finally:
         await conn.close()
 

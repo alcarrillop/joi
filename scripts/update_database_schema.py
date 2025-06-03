@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """
 Database Schema Update Script
-============================
+=============================
 
-This script updates the database schema to include improvements:
-1. Ensures user_goals table exists
-2. Applies any schema changes from init_db.sql
-3. Validates all tables and indices
+Ensures all required tables exist and have proper structure for the JOI system.
+This script:
 
-Run this after making database schema changes.
+1. Ensures learning_stats table exists
+2. Checks core database health
+3. Validates essential table structure
+
+Note: After simplification, this focuses only on essential tables.
 """
 
 import asyncio
@@ -16,67 +18,88 @@ import os
 import sys
 
 # Add src to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+script_dir = os.path.dirname(os.path.abspath(__file__))
+src_dir = os.path.join(script_dir, "..", "src")
+src_dir = os.path.normpath(src_dir)
+if os.path.exists(src_dir):
+    sys.path.insert(0, src_dir)
 
 import asyncpg
+from agent.core.database import get_database_url
 
-from src.agent.core.database import execute_sql_script, get_database_url
 
-
-async def update_database_schema():
-    """Update database schema with latest changes."""
-    print("🔄 Updating database schema...")
+async def check_and_update_schema():
+    """Check and update database schema as needed."""
+    database_url = get_database_url()
+    conn = await asyncpg.connect(database_url)
 
     try:
-        # Execute the updated init_db.sql script
-        await execute_sql_script("scripts/init_db.sql")
+        print("🔍 Checking database schema...")
 
-        # Verify new tables exist
-        database_url = get_database_url()
-        conn = await asyncpg.connect(database_url)
+        # Check core essential tables after simplification
+        print("\n📊 Checking essential tables...")
 
-        # Check for user_goals table
-        table_exists = await conn.fetchval(
-            "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'user_goals')"
+        user_goals_exists = await conn.fetchval(
+            "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'learning_stats')"
         )
 
-        if table_exists:
-            print("✅ user_goals table exists")
+        if user_goals_exists:
+            print("✅ learning_stats table exists")
 
-            # Check table structure
-            columns = await conn.fetch(
-                """SELECT column_name, data_type, is_nullable
-                   FROM information_schema.columns
-                   WHERE table_name = 'user_goals'
-                   ORDER BY ordinal_position"""
-            )
+            # Show table structure for verification
+            columns = await conn.fetch("""
+                SELECT column_name, data_type, is_nullable
+                FROM information_schema.columns
+                WHERE table_name = 'learning_stats'
+                ORDER BY ordinal_position
+            """)
 
-            print("📊 user_goals table structure:")
+            print("📊 learning_stats table structure:")
             for col in columns:
-                nullable = "NULL" if col["is_nullable"] == "YES" else "NOT NULL"
-                print(f"  - {col['column_name']}: {col['data_type']} {nullable}")
+                print(
+                    f"  • {col['column_name']}: {col['data_type']} ({'NULL' if col['is_nullable'] == 'YES' else 'NOT NULL'})"
+                )
         else:
-            print("❌ user_goals table missing")
+            print("❌ learning_stats table missing - this should exist!")
 
-        # Check all expected tables exist
-        expected_tables = ["users", "sessions", "messages", "learning_stats", "user_goals"]
+        # Check all essential tables
+        expected_tables = ["users", "sessions", "messages", "learning_stats"]
+
+        print(f"\n🔍 Verifying {len(expected_tables)} essential tables...")
         for table in expected_tables:
-            exists = await conn.fetchval(
-                "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = $1)", table
-            )
-            status = "✅" if exists else "❌"
-            print(f"{status} {table} table")
+            exists = await conn.fetchval(f"""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables
+                    WHERE table_name = '{table}'
+                )
+            """)
 
-        await conn.close()
-        print("✅ Database schema update completed successfully!")
+            if exists:
+                count = await conn.fetchval(f"SELECT COUNT(*) FROM {table}")
+                print(f"✅ {table}: {count:,} rows")
+            else:
+                print(f"❌ {table}: MISSING")
+
+        print("\n🎯 Database schema check complete!")
+        print("📋 Essential tables for memory-focused system verified.")
 
     except Exception as e:
-        print(f"❌ Database schema update failed: {e}")
+        print(f"❌ Error checking schema: {e}")
         return False
+    finally:
+        await conn.close()
 
     return True
 
 
 if __name__ == "__main__":
-    success = asyncio.run(update_database_schema())
-    exit(0 if success else 1)
+    print("🔧 Database Schema Update Script")
+    print("=" * 50)
+
+    success = asyncio.run(check_and_update_schema())
+
+    if success:
+        print("\n✅ Schema check completed successfully!")
+    else:
+        print("\n❌ Schema check failed!")
+        sys.exit(1)

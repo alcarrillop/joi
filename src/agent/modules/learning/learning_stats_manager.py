@@ -13,10 +13,11 @@ import uuid
 from typing import Dict, List, Optional
 
 import asyncpg
-from agent.core.database import get_database_url
-from agent.settings import settings
 from langchain_groq import ChatGroq
 from pydantic import BaseModel
+
+from agent.core.database import get_database_url
+from agent.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -50,56 +51,104 @@ class LearningStatsManager:
             max_retries=2,
         )
 
-        # Common vocabulary by level
+        # Basic vocabulary for beginners (A1-A2 level)
         self.basic_vocabulary = {
             "hello",
-            "hi",
-            "bye",
-            "thank",
-            "you",
-            "please",
+            "goodbye",
             "yes",
             "no",
-            "good",
-            "bad",
-            "big",
-            "small",
-            "have",
-            "do",
-            "go",
-            "come",
-            "see",
-            "know",
-            "think",
-            "want",
+            "please",
+            "thank",
+            "you",
+            "name",
+            "age",
+            "from",
+            "live",
+            "work",
+            "study",
             "like",
             "love",
-            "work",
-            "home",
+            "food",
+            "water",
+            "house",
             "family",
             "friend",
             "time",
             "day",
-            "night",
-            "eat",
-            "drink",
-            "food",
-            "water",
+            "week",
+            "month",
+            "year",
+            "today",
+            "tomorrow",
+            "yesterday",
+            "good",
+            "bad",
+            "happy",
+            "sad",
+            "big",
+            "small",
+            "new",
+            "old",
+            "hot",
+            "cold",
+            "red",
+            "blue",
+            "green",
+            "white",
+            "black",
+            "one",
+            "two",
+            "three",
+            "four",
+            "five",
+            "ten",
             "money",
-            "house",
-            "car",
             "book",
-            "read",
-            "write",
+            "car",
+            "phone",
+            "computer",
+            "english",
+            "spanish",
+            "language",
+            "learn",
+            "teach",
             "speak",
             "listen",
-            "learn",
-            "study",
+            "read",
+            "write",
+            "understand",
+            "help",
+            "know",
+            "think",
+            "feel",
+            "want",
+            "need",
+            "come",
+            "go",
+            "see",
+            "hear",
+            "eat",
+            "drink",
+            "sleep",
+            "wake",
+            "open",
+            "close",
+            "buy",
+            "sell",
+            "give",
+            "take",
+            "make",
+            "do",
+            "say",
+            "tell",
+            "ask",
+            "answer",
             "school",
             "teacher",
             "student",
         }
 
+        # Advanced vocabulary for intermediate+ learners (B1+ level)
         self.intermediate_vocabulary = {
             "marketing",
             "business",
@@ -123,10 +172,139 @@ class LearningStatsManager:
             "networking",
             "communication",
             "opportunity",
+            "development",
+            "experience",
+            "organization",
+            "decision",
+            "investment",
+            "technology",
+            "innovation",
+            "collaboration",
+            "achievement",
+            "performance",
+            "efficiency",
+            "productivity",
+            "creativity",
+            "leadership",
+            "motivation",
+            "challenge",
+            "solution",
+            "analysis",
+            "research",
+            "investigation",
+            "implementation",
+            "evaluation",
+            "recommendation",
         }
 
+        # Common non-English words and proper nouns to exclude
+        self.excluded_words = {
+            "muy",  # Spanish
+            "que",  # Spanish/French
+            "el",
+            "la",
+            "los",
+            "las",  # Spanish articles
+            "de",
+            "del",
+            "en",
+            "con",
+            "por",
+            "para",  # Spanish prepositions
+            "whatsapp",
+            "instagram",
+            "facebook",
+            "youtube",  # Platforms
+            "zoom",
+            "google",
+            "microsoft",
+            "apple",  # Brands
+            "covid",
+            "coronavirus",  # Current events
+            "ok",
+            "okay",
+            "yeah",
+            "yep",
+            "nope",
+            "hmm",
+            "uhm",  # Interjections
+        }
+
+    def _is_valid_english_word(self, word: str) -> bool:
+        """Check if word is a valid English vocabulary word to track."""
+        word_lower = word.lower()
+
+        # Must be alphabetic only
+        if not word.isalpha():
+            return False
+
+        # Must be reasonable length (3-15 characters)
+        if len(word) < 3 or len(word) > 15:
+            return False
+
+        # Exclude proper nouns (capitalized words that aren't sentence starters)
+        if (
+            word[0].isupper()
+            and word_lower not in self.basic_vocabulary
+            and word_lower not in self.intermediate_vocabulary
+        ):
+            return False
+
+        # Exclude non-English and excluded words
+        if word_lower in self.excluded_words:
+            return False
+
+        # Exclude very common words that aren't useful for tracking
+        stop_words = {
+            "the",
+            "and",
+            "but",
+            "or",
+            "so",
+            "if",
+            "when",
+            "where",
+            "why",
+            "how",
+            "this",
+            "that",
+            "these",
+            "those",
+            "here",
+            "there",
+            "now",
+            "then",
+            "very",
+            "much",
+            "many",
+            "some",
+            "any",
+            "all",
+            "every",
+            "each",
+            "more",
+            "most",
+            "less",
+            "few",
+            "little",
+            "big",
+            "small",
+            "good",
+            "bad",
+            "well",
+            "better",
+            "best",
+            "nice",
+            "great",
+        }
+
+        if word_lower in stop_words:
+            return False
+
+        return True
+
     async def analyze_vocabulary(self, text: str, user_level: str = "A1") -> VocabularyAnalysis:
-        """Analyze vocabulary used in the text."""
+        """Analyze vocabulary used in the text - English words only."""
         words = self._extract_words(text)
 
         new_words = []
@@ -134,16 +312,26 @@ class LearningStatsManager:
         basic_words = []
 
         for word in words:
+            # Only process valid English words
+            if not self._is_valid_english_word(word):
+                continue
+
             word_lower = word.lower()
 
             if word_lower in self.basic_vocabulary:
-                basic_words.append(word)
+                basic_words.append(word_lower)
             elif word_lower in self.intermediate_vocabulary:
-                advanced_words.append(word)
-                if len(word) > 3 and word.isalpha():  # Only meaningful new words
-                    new_words.append(word)
-            elif len(word) > 4 and word.isalpha():  # New technical/advanced words
-                new_words.append(word)
+                advanced_words.append(word_lower)
+                new_words.append(word_lower)  # Intermediate words are worth tracking
+            else:
+                # Check if it's a meaningful new word (not in our basic sets)
+                if len(word) >= 4:  # Reasonable length for new vocabulary
+                    new_words.append(word_lower)
+
+        # Remove duplicates while preserving order
+        new_words = list(dict.fromkeys(new_words))
+        advanced_words = list(dict.fromkeys(advanced_words))
+        basic_words = list(dict.fromkeys(basic_words))
 
         return VocabularyAnalysis(
             new_words=new_words[:10],  # Limit to top 10

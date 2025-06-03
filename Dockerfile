@@ -1,39 +1,51 @@
-# Use an appropriate base image
+# Use Python 3.12 with uv package manager
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
-# Install the project into `/app`
+# Set working directory
 WORKDIR /app
 
-# Set environment variables (e.g., set Python to run in unbuffered mode)
-ENV PYTHONUNBUFFERED 1
+# Set environment variables for production
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONPATH=/app/src
 
-# Install system dependencies for building libraries
+# Install system dependencies including PostgreSQL client
 RUN apt-get update && apt-get install -y \
     build-essential \
     g++ \
-    && rm -rf /var/lib/apt/lists/*
+    curl \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
-# Copy the dependency management files (lock file and pyproject.toml) first
-COPY uv.lock pyproject.toml README.md /app/
+# Copy dependency files
+COPY uv.lock pyproject.toml README.md ./
 
-# Install the application dependencies
-RUN uv sync --frozen --no-cache
+# Install dependencies
+RUN uv sync --frozen --no-cache --no-dev
 
-# Copy your application code into the container
-COPY src/ /app/
+# Copy application source code
+COPY src/ ./src/
+COPY scripts/ ./scripts/
 
-# Set the virtual environment environment variables
-ENV VIRTUAL_ENV=/app/.venv \
-    PATH="/app/.venv/bin:$PATH"
+# Set virtual environment path
+ENV VIRTUAL_ENV=/app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Install the package in editable mode
 RUN uv pip install -e .
 
-# Define volumes
-VOLUME ["/app/data"]
+# Create app user for security
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+RUN chown -R appuser:appuser /app
+USER appuser
 
-# Expose the port
-EXPOSE 8080
+# Expose port (Railway will set PORT env var)
+EXPOSE ${PORT:-8000}
 
-# Run the FastAPI app using uvicorn
-CMD ["/app/.venv/bin/fastapi", "run", "ai_companion/interfaces/whatsapp/webhook_endpoint.py", "--port", "8080", "--host", "0.0.0.0"]
+# Health check for Railway
+HEALTHCHECK --interval=30s --timeout=30s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:${PORT:-8000}/debug/health || exit 1
+
+# Run the application (Railway compatible)
+CMD ["sh", "-c", "fastapi run src/agent/interfaces/whatsapp/webhook_endpoint.py --port ${PORT:-8000} --host 0.0.0.0 --workers 1"]
