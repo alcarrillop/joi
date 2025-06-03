@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from agent.core.database import get_database_url, get_user_learning_stats
 from agent.modules.memory.long_term.memory_manager import get_memory_manager
+from agent.modules.curriculum.curriculum_manager import get_curriculum_manager
 from agent.settings import settings
 
 debug_router = APIRouter(prefix="/debug", tags=["Debug"])
@@ -44,12 +45,24 @@ class MemoryInfo(BaseModel):
     score: Optional[float]
     metadata: Dict
 
+class CompetencyInfo(BaseModel):
+    id: str
+    name: str
+    description: str
+    level: str
+    skill_type: str
+    estimated_hours: int
+    key_vocabulary: List[str]
+    prerequisites: List[str]
+
 class SystemStats(BaseModel):
     total_users: int
     total_sessions: int
     total_messages: int
     active_sessions: int
     total_memories: int
+    total_assessments: int
+    total_competencies_completed: int
 
 @debug_router.get("/stats", response_model=SystemStats)
 async def get_system_stats():
@@ -63,6 +76,15 @@ async def get_system_stats():
         total_sessions = await conn.fetchval("SELECT COUNT(*) FROM sessions")
         total_messages = await conn.fetchval("SELECT COUNT(*) FROM messages")
         active_sessions = await conn.fetchval("SELECT COUNT(*) FROM sessions WHERE ended_at IS NULL")
+        
+        # Estadísticas de currículo
+        total_assessments = await conn.fetchval("SELECT COUNT(*) FROM assessments")
+        total_competencies_completed = await conn.fetchval("""
+            SELECT COUNT(*) FROM (
+                SELECT user_id, unnest(completed_competencies) as competency 
+                FROM user_progress
+            ) as completed
+        """)
         
         # Estadísticas de memoria
         memory_manager = get_memory_manager()
@@ -81,7 +103,9 @@ async def get_system_stats():
             total_sessions=total_sessions or 0, 
             total_messages=total_messages or 0,
             active_sessions=active_sessions or 0,
-            total_memories=total_memories
+            total_memories=total_memories,
+            total_assessments=total_assessments or 0,
+            total_competencies_completed=total_competencies_completed or 0
         )
     finally:
         await conn.close()
@@ -223,13 +247,125 @@ async def get_user_learning_statistics(user_id: str):
         memory_manager = get_memory_manager()
         memory_stats = memory_manager.get_user_memory_stats(user_id)
         
+        # Obtener estadísticas del currículo
+        curriculum_manager = get_curriculum_manager()
+        curriculum_stats = await curriculum_manager.get_learning_statistics(user_id)
+        
         return {
             "user_id": user_id,
             "learning_stats": stats,
-            "memory_stats": memory_stats
+            "memory_stats": memory_stats,
+            "curriculum_stats": curriculum_stats
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving learning stats: {str(e)}")
+
+@debug_router.get("/users/{user_id}/curriculum-progress")
+async def get_user_curriculum_progress(user_id: str):
+    """Obtener progreso del currículo de un usuario."""
+    try:
+        curriculum_manager = get_curriculum_manager()
+        progress = await curriculum_manager.get_user_progress(user_id)
+        
+        if not progress:
+            raise HTTPException(status_code=404, detail="User progress not found")
+        
+        # Obtener competencias disponibles
+        available_competencies = await curriculum_manager.get_current_competencies(user_id)
+        recommended = await curriculum_manager.get_next_recommended_competency(user_id)
+        
+        return {
+            "user_id": user_id,
+            "current_level": progress.current_level.value,
+            "level_start_date": progress.level_start_date,
+            "completed_competencies": list(progress.completed_competencies),
+            "in_progress_competencies": list(progress.in_progress_competencies),
+            "mastery_scores": progress.mastery_scores,
+            "last_assessment_date": progress.last_assessment_date,
+            "available_competencies": [
+                {
+                    "id": comp.id,
+                    "name": comp.name,
+                    "skill_type": comp.skill_type.value,
+                    "estimated_hours": comp.estimated_hours,
+                    "is_completed": comp.id in progress.completed_competencies,
+                    "is_in_progress": comp.id in progress.in_progress_competencies
+                } for comp in available_competencies
+            ],
+            "recommended_competency": {
+                "id": recommended.id,
+                "name": recommended.name,
+                "description": recommended.description,
+                "skill_type": recommended.skill_type.value,
+                "estimated_hours": recommended.estimated_hours,
+                "key_vocabulary": recommended.key_vocabulary[:10]  # Primeras 10 palabras
+            } if recommended else None
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving curriculum progress: {str(e)}")
+
+@debug_router.get("/users/{user_id}/assessments")
+async def get_user_assessments(user_id: str, limit: int = Query(20, ge=1, le=100)):
+    """Obtener evaluaciones de un usuario."""
+    database_url = get_database_url()
+    conn = await asyncpg.connect(database_url)
+    
+    try:
+        assessments = await conn.fetch("""
+            SELECT id, competency_id, skill_type, score, max_score, timestamp, 
+                   feedback, areas_for_improvement, strengths
+            FROM assessments 
+            WHERE user_id = $1 
+            ORDER BY timestamp DESC 
+            LIMIT $2
+        """, user_id, limit)
+        
+        return [
+            {
+                "id": str(assessment['id']),
+                "competency_id": assessment['competency_id'],
+                "skill_type": assessment['skill_type'],
+                "score": assessment['score'],
+                "max_score": assessment['max_score'],
+                "score_percentage": assessment['score'] / assessment['max_score'] * 100,
+                "timestamp": assessment['timestamp'],
+                "feedback": assessment['feedback'],
+                "areas_for_improvement": assessment['areas_for_improvement'],
+                "strengths": assessment['strengths']
+            } for assessment in assessments
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving assessments: {str(e)}")
+    finally:
+        await conn.close()
+
+@debug_router.get("/curriculum/competencies")
+async def get_all_competencies():
+    """Obtener todas las competencias del currículo."""
+    try:
+        curriculum_manager = get_curriculum_manager()
+        all_competencies = []
+        
+        for level, modules in curriculum_manager.learning_modules.items():
+            for module in modules:
+                for comp in module.competencies:
+                    all_competencies.append({
+                        "id": comp.id,
+                        "name": comp.name,
+                        "description": comp.description,
+                        "level": comp.level.value,
+                        "skill_type": comp.skill_type.value,
+                        "competency_type": comp.competency_type.value,
+                        "prerequisites": comp.prerequisites,
+                        "estimated_hours": comp.estimated_hours,
+                        "key_vocabulary": comp.key_vocabulary,
+                        "grammar_points": comp.grammar_points,
+                        "learning_objectives": comp.learning_objectives
+                    })
+        
+        return all_competencies
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving competencies: {str(e)}")
 
 @debug_router.post("/users/{user_id}/test-memory")
 async def test_user_memory(user_id: str, query: str):
@@ -307,7 +443,8 @@ async def debug_health_check():
         "timestamp": datetime.now(),
         "database": "unknown",
         "vector_store": "unknown", 
-        "memory_manager": "unknown"
+        "memory_manager": "unknown",
+        "curriculum_manager": "unknown"
     }
     
     # Test database
@@ -338,7 +475,14 @@ async def debug_health_check():
     except Exception as e:
         health_status["memory_manager"] = f"error: {str(e)}"
     
-    return health_status 
+    # Test curriculum manager
+    try:
+        curriculum_manager = get_curriculum_manager()
+        health_status["curriculum_manager"] = "healthy"
+    except Exception as e:
+        health_status["curriculum_manager"] = f"error: {str(e)}"
+    
+    return health_status
 
 @debug_router.get("/dashboard", response_class=HTMLResponse)
 async def debug_dashboard():
