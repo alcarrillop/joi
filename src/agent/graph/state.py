@@ -13,6 +13,8 @@ class AICompanionState(MessagesState):
         audio_buffer (bytes): The audio buffer to be used for speech-to-text conversion.
         current_activity (str): The current activity of Joi based on the schedule.
         memory_context (str): The context of the memories to be injected into the character card.
+        user_id (str): The unique identifier for the user from the database.
+        session_id (str): The unique identifier for the current session from the database.
     """
 
     summary: str
@@ -22,3 +24,5 @@ class AICompanionState(MessagesState):
     current_activity: str
     apply_activity: bool
     memory_context: str
+    user_id: str
+    session_id: str

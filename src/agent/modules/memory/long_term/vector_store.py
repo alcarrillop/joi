@@ -6,7 +6,7 @@ from typing import List, Optional
 
 from agent.settings import settings
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, PointStruct, VectorParams
+from qdrant_client.models import Distance, PointStruct, VectorParams, Filter, FieldCondition, MatchValue, PayloadSchemaType
 from sentence_transformers import SentenceTransformer
 
 
@@ -26,6 +26,14 @@ class Memory:
     def timestamp(self) -> Optional[datetime]:
         ts = self.metadata.get("timestamp")
         return datetime.fromisoformat(ts) if ts else None
+
+    @property
+    def user_id(self) -> Optional[str]:
+        return self.metadata.get("user_id")
+
+    @property
+    def session_id(self) -> Optional[str]:
+        return self.metadata.get("session_id")
 
 
 class VectorStore:
@@ -72,17 +80,32 @@ class VectorStore:
                 distance=Distance.COSINE,
             ),
         )
+        
+        # Create index for user_id field to enable filtering
+        self.client.create_payload_index(
+            collection_name=self.COLLECTION_NAME,
+            field_name="user_id",
+            field_schema=PayloadSchemaType.KEYWORD
+        )
+        
+        # Create index for session_id field as well
+        self.client.create_payload_index(
+            collection_name=self.COLLECTION_NAME,
+            field_name="session_id", 
+            field_schema=PayloadSchemaType.KEYWORD
+        )
 
-    def find_similar_memory(self, text: str) -> Optional[Memory]:
-        """Find if a similar memory already exists.
+    def find_similar_memory(self, text: str, user_id: str) -> Optional[Memory]:
+        """Find if a similar memory already exists for a specific user.
 
         Args:
             text: The text to search for
+            user_id: The user ID to filter by
 
         Returns:
-            Optional Memory if a similar one is found
+            Optional Memory if a similar one is found for this user
         """
-        results = self.search_memories(text, k=1)
+        results = self.search_memories(text, user_id=user_id, k=1)
         if results and results[0].score >= self.SIMILARITY_THRESHOLD:
             return results[0]
         return None
@@ -92,13 +115,19 @@ class VectorStore:
 
         Args:
             text: The text content of the memory
-            metadata: Additional information about the memory (timestamp, type, etc.)
+            metadata: Additional information about the memory (timestamp, type, user_id, session_id, etc.)
         """
         if not self._collection_exists():
             self._create_collection()
 
-        # Check if similar memory exists
-        similar_memory = self.find_similar_memory(text)
+        # Validate required metadata
+        if "user_id" not in metadata:
+            raise ValueError("user_id is required in metadata")
+        if "session_id" not in metadata:
+            raise ValueError("session_id is required in metadata")
+
+        # Check if similar memory exists for this user
+        similar_memory = self.find_similar_memory(text, metadata["user_id"])
         if similar_memory and similar_memory.id:
             metadata["id"] = similar_memory.id  # Keep same ID for update
 
@@ -117,23 +146,36 @@ class VectorStore:
             points=[point],
         )
 
-    def search_memories(self, query: str, k: int = 5) -> List[Memory]:
-        """Search for similar memories in the vector store.
+    def search_memories(self, query: str, user_id: str, k: int = 5) -> List[Memory]:
+        """Search for similar memories in the vector store for a specific user.
 
         Args:
             query: Text to search for
+            user_id: The user ID to filter by
             k: Number of results to return
 
         Returns:
-            List of Memory objects
+            List of Memory objects belonging to the specified user
         """
         if not self._collection_exists():
             return []
 
         query_embedding = self.model.encode(query)
+        
+        # Create filter for user_id
+        user_filter = Filter(
+            must=[
+                FieldCondition(
+                    key="user_id",
+                    match=MatchValue(value=user_id)
+                )
+            ]
+        )
+
         results = self.client.search(
             collection_name=self.COLLECTION_NAME,
             query_vector=query_embedding.tolist(),
+            query_filter=user_filter,
             limit=k,
         )
 
@@ -145,6 +187,69 @@ class VectorStore:
             )
             for hit in results
         ]
+
+    def get_user_memory_count(self, user_id: str) -> int:
+        """Get the total count of memories for a specific user.
+
+        Args:
+            user_id: The user ID to count memories for
+
+        Returns:
+            Total number of memories for the user
+        """
+        if not self._collection_exists():
+            return 0
+
+        user_filter = Filter(
+            must=[
+                FieldCondition(
+                    key="user_id",
+                    match=MatchValue(value=user_id)
+                )
+            ]
+        )
+
+        result = self.client.count(
+            collection_name=self.COLLECTION_NAME,
+            count_filter=user_filter,
+        )
+        
+        return result.count
+
+    def delete_user_memories(self, user_id: str) -> int:
+        """Delete all memories for a specific user (GDPR compliance).
+
+        Args:
+            user_id: The user ID whose memories should be deleted
+
+        Returns:
+            Number of memories deleted
+        """
+        if not self._collection_exists():
+            return 0
+
+        user_filter = Filter(
+            must=[
+                FieldCondition(
+                    key="user_id",
+                    match=MatchValue(value=user_id)
+                )
+            ]
+        )
+
+        # First count how many we'll delete
+        count_result = self.client.count(
+            collection_name=self.COLLECTION_NAME,
+            count_filter=user_filter,
+        )
+
+        # Delete the points
+        self.client.delete(
+            collection_name=self.COLLECTION_NAME,
+            points_selector=user_filter,
+        )
+
+        return count_result.count
 
 
 @lru_cache

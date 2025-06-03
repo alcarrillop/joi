@@ -12,7 +12,7 @@ from agent.graph import graph_builder
 from agent.modules.image import ImageToText
 from agent.modules.speech import SpeechToText, TextToSpeech
 from agent.settings import settings
-from agent.core.database import get_checkpointer
+from agent.core.database import get_checkpointer, get_or_create_user, get_or_create_session, log_message
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,10 @@ async def whatsapp_handler(request: Request) -> Response:
         if "messages" in change_value:
             message = change_value["messages"][0]
             from_number = message["from"]
-            session_id = from_number
+            
+            # Get or create user and session
+            user_id = await get_or_create_user(from_number)
+            session_id = await get_or_create_session(user_id)
 
             # Get user message and handle different message types
             content = ""
@@ -67,19 +70,33 @@ async def whatsapp_handler(request: Request) -> Response:
             else:
                 content = message["text"]["body"]
 
+            # Log the incoming user message
+            await log_message(session_id, "user", content)
+
             # Process message through the graph agent
             async with await get_checkpointer() as checkpointer:
                 graph = graph_builder.compile(checkpointer=checkpointer)
+                
+                # Set initial state with user and session info
+                initial_state = {
+                    "messages": [HumanMessage(content=content)],
+                    "user_id": user_id,
+                    "session_id": session_id
+                }
+                
                 await graph.ainvoke(
-                    {"messages": [HumanMessage(content=content)]},
-                    {"configurable": {"thread_id": session_id}},
+                    initial_state,
+                    {"configurable": {"thread_id": from_number}},  # Keep using phone number as thread_id for LangGraph
                 )
 
                 # Get the workflow type and response from the state
-                output_state = await graph.aget_state(config={"configurable": {"thread_id": session_id}})
+                output_state = await graph.aget_state(config={"configurable": {"thread_id": from_number}})
 
             workflow = output_state.values.get("workflow", "conversation")
             response_message = output_state.values["messages"][-1].content
+
+            # Log the agent response
+            await log_message(session_id, "agent", response_message)
 
             # Handle different response types based on workflow
             if workflow == "audio":
