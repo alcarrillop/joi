@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from agent.core.prompts import MEMORY_ANALYSIS_PROMPT
 from agent.modules.memory.long_term.vector_store import get_vector_store
-from agent.settings import settings
+from agent.settings import get_settings
 from langchain_core.messages import BaseMessage
 from langchain_groq import ChatGroq
 from pydantic import BaseModel, Field
@@ -27,6 +27,7 @@ class MemoryManager:
     def __init__(self):
         self.vector_store = get_vector_store()
         self.logger = logging.getLogger(__name__)
+        settings = get_settings()
         self.llm = ChatGroq(
             model=settings.SMALL_TEXT_MODEL_NAME,
             api_key=settings.GROQ_API_KEY,
@@ -86,6 +87,7 @@ class MemoryManager:
             List of relevant memory texts for the user
         """
         try:
+            settings = get_settings()
             memories = self.vector_store.search_memories(context, user_id=user_id, k=settings.MEMORY_TOP_K)
             if memories:
                 for memory in memories:

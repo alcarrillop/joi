@@ -17,7 +17,7 @@ from langchain_groq import ChatGroq
 from pydantic import BaseModel
 
 from agent.core.database import get_database_url
-from agent.settings import settings
+from agent.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +45,8 @@ class LearningStatsManager:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self.llm = ChatGroq(
-            model=settings.SMALL_TEXT_MODEL_NAME,
-            api_key=settings.GROQ_API_KEY,
+            model=get_settings().SMALL_TEXT_MODEL_NAME,
+            api_key=get_settings().GROQ_API_KEY,
             temperature=0.1,
             max_retries=2,
         )

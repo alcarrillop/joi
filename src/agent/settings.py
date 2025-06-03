@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     TESTING: str = "false"
 
 
-# Lazy loading to avoid startup errors
+# Global settings instance (lazy loaded)
 _settings: Optional[Settings] = None
 
 
@@ -66,5 +66,5 @@ def get_settings() -> Settings:
     return _settings
 
 
-# For backward compatibility
-settings = get_settings()
+# DO NOT instantiate settings at module level - this causes validation errors at import time
+# Use get_settings() instead wherever you need settings
