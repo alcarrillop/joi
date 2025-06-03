@@ -1,28 +1,35 @@
 #!/usr/bin/env python3
 """
-Script para crear las tablas del sistema de currículo
+Script to create curriculum system tables
 """
 import asyncio
 import asyncpg
+import sys
+import os
+
+# Add parent directory to path so we can import from src
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from src.agent.core.database import get_database_url
 
 async def create_curriculum_tables():
-    """Crea las tablas del sistema de currículo"""
+    """Create curriculum system tables"""
     database_url = get_database_url()
-    print(f"🔗 Conectando a base de datos...")
+    print(f"🔗 Connecting to database...")
     
     conn = await asyncpg.connect(database_url)
     try:
-        # Leer el script SQL
-        with open('scripts/curriculum_tables.sql', 'r') as f:
+        # Read SQL script
+        script_path = os.path.join(os.path.dirname(__file__), 'curriculum_tables.sql')
+        with open(script_path, 'r') as f:
             sql_script = f.read()
         
-        # Ejecutar el script
-        print("📊 Creando tablas del sistema de currículo...")
+        # Execute script
+        print("📊 Creating curriculum system tables...")
         await conn.execute(sql_script)
-        print("✅ Tablas de currículo creadas exitosamente!")
+        print("✅ Curriculum tables created successfully!")
         
-        # Verificar que las tablas fueron creadas
+        # Verify tables were created
         tables = await conn.fetch("""
             SELECT table_name FROM information_schema.tables 
             WHERE table_schema = 'public' 
@@ -31,11 +38,11 @@ async def create_curriculum_tables():
             ORDER BY table_name
         """)
         
-        print("\n📋 Tablas creadas:")
+        print("\n📋 Tables created:")
         for table in tables:
             print(f"  ✓ {table['table_name']}")
         
-        # Verificar vistas
+        # Verify views
         views = await conn.fetch("""
             SELECT table_name FROM information_schema.views 
             WHERE table_schema = 'public' 
@@ -43,7 +50,7 @@ async def create_curriculum_tables():
             ORDER BY table_name
         """)
         
-        print("\n👁 Vistas creadas:")
+        print("\n👁 Views created:")
         for view in views:
             print(f"  ✓ {view['table_name']}")
         

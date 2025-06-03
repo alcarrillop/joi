@@ -1,5 +1,5 @@
 """
-Modelos de datos para el sistema de currículo y progresión de aprendizaje
+Data models for curriculum system and learning progression
 """
 from dataclasses import dataclass, field
 from enum import Enum
@@ -16,7 +16,7 @@ class CEFRLevel(Enum):
     C2 = "C2"  # Proficient
 
 class SkillType(Enum):
-    """Tipos de habilidades lingüísticas"""
+    """Types of language skills"""
     LISTENING = "listening"
     SPEAKING = "speaking" 
     READING = "reading"
@@ -26,7 +26,7 @@ class SkillType(Enum):
     PRONUNCIATION = "pronunciation"
 
 class CompetencyType(Enum):
-    """Tipos de competencias específicas"""
+    """Types of specific competencies"""
     # Vocabulary competencies
     BASIC_VOCABULARY = "basic_vocabulary"
     FAMILY_VOCABULARY = "family_vocabulary"
@@ -69,7 +69,7 @@ class Competency:
 
 @dataclass
 class LearningModule:
-    """Un módulo de aprendizaje que agrupa competencias"""
+    """A learning module that groups competencies"""
     id: str
     name: str
     description: str
@@ -80,7 +80,7 @@ class LearningModule:
 
 @dataclass
 class UserProgress:
-    """Progreso de un usuario en el currículo"""
+    """User progress in the curriculum"""
     user_id: str
     current_level: CEFRLevel
     completed_competencies: Set[str] = field(default_factory=set)
@@ -91,7 +91,7 @@ class UserProgress:
     
 @dataclass
 class AssessmentResult:
-    """Resultado de una evaluación"""
+    """Result of an assessment"""
     user_id: str
     competency_id: str
     skill_type: SkillType
