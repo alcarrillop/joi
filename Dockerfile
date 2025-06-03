@@ -60,9 +60,9 @@ ENV PATH="/app/.venv/bin:$PATH"
 # Expose port
 EXPOSE 8000
 
-# Health check for Railway (using PORT env var at runtime)
+# Health check for Railway (using simple endpoint)
 HEALTHCHECK --interval=30s --timeout=30s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:${PORT:-8000}/debug/health || exit 1
+  CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
 # Run the application (Railway compatible)
 CMD ["sh", "-c", "uvicorn src.agent.interfaces.whatsapp.webhook_endpoint:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]

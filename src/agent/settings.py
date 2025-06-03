@@ -1,8 +1,18 @@
+from typing import Optional
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        # Don't require .env file to exist
+        env_ignore_empty=True,
+        # Use environment variables from system
+        case_sensitive=True,
+    )
 
     # AI API Keys
     GROQ_API_KEY: str
@@ -21,10 +31,10 @@ class Settings(BaseSettings):
     SUPABASE_KEY: str
 
     # Vector Database Configuration
-    QDRANT_API_KEY: str | None
+    QDRANT_API_KEY: Optional[str] = None
     QDRANT_URL: str
     QDRANT_PORT: str = "6333"
-    QDRANT_HOST: str | None = None
+    QDRANT_HOST: Optional[str] = None
 
     # Model Configuration
     TEXT_MODEL_NAME: str = "llama-3.3-70b-versatile"
@@ -44,4 +54,17 @@ class Settings(BaseSettings):
     TESTING: str = "false"
 
 
-settings = Settings()
+# Lazy loading to avoid startup errors
+_settings: Optional[Settings] = None
+
+
+def get_settings() -> Settings:
+    """Get settings instance, creating it if needed."""
+    global _settings
+    if _settings is None:
+        _settings = Settings()
+    return _settings
+
+
+# For backward compatibility
+settings = get_settings()
