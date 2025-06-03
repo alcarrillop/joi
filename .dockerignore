@@ -1,0 +1,78 @@
+# Git files
+.git
+.gitignore
+
+# Virtual environments
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env
+venv
+ENV
+.env.local
+.env.*.local
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Testing and development
+.pytest_cache
+.coverage
+.tox
+.cache
+htmlcov
+*.cover
+.hypothesis
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Temporary files
+.tmp
+.temp
+temp/
+tmp/
+
+# Logs
+*.log
+logs/
+
+# Runtime data
+pids
+*.pid
+*.seed
+
+# Dependency directories (we copy specific files)
+node_modules/
+
+# Development tools
+.pre-commit-config.yaml
+.ruff_cache/
+.langgraph_api/
+.mypy_cache/
+
+# Railway/deployment configs
+railway.toml
+cloudbuild.yaml
+
+# Other project files
+LICENSE
+DEPLOYMENT.md 
