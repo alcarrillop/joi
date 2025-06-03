@@ -2,25 +2,25 @@
 """
 Debug tools for monitoring and analyzing the system via command line
 """
+
 import asyncio
-import asyncpg
-import httpx
-import sys
 import os
+import sys
+
+import httpx
 
 # Add parent directory to path so we can import from src
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from datetime import datetime, timedelta
-from typing import List, Dict, Any
 
 # API configuration
 BASE_URL = "http://localhost:8000"
 
+
 async def get_system_stats():
     """Show system statistics."""
     print("📊 System statistics:")
-    
+
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(f"{BASE_URL}/debug/stats")
@@ -39,19 +39,20 @@ async def get_system_stats():
             print(f"   ❌ Connection error: {e}")
             return None
 
+
 async def list_users(limit: int = 10):
     """Show all users in the system."""
     print(f"👥 System users (limit {limit}):")
-    
+
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(f"{BASE_URL}/debug/users?limit={limit}")
             if response.status_code == 200:
                 users = response.json()
                 for user in users:
-                    phone = user.get('phone_number', 'Unknown')
-                    name = user.get('name') or 'Unnamed'
-                    created = user.get('created_at', '')[:10]
+                    phone = user.get("phone_number", "Unknown")
+                    name = user.get("name") or "Unnamed"
+                    created = user.get("created_at", "")[:10]
                     print(f"   📱 {phone} - {name} (created: {created})")
                 return users
             else:
@@ -61,22 +62,23 @@ async def list_users(limit: int = 10):
             print(f"   ❌ Connection error: {e}")
             return []
 
+
 async def show_user_memories(user_id: str, query: str = ""):
     """Show memories from a specific user."""
     print(f"🧠 User memories {user_id[:8]}{'...' if len(user_id) > 8 else ''}:")
-    
+
     async with httpx.AsyncClient() as client:
         try:
             url = f"{BASE_URL}/debug/users/{user_id}/memories"
             if query:
                 url += f"?query={query}"
-            
+
             response = await client.get(url)
             if response.status_code == 200:
                 memories = response.json()
                 for memory in memories[:10]:  # Show first 10
-                    content = memory.get('content', '')[:100]
-                    timestamp = memory.get('timestamp', '')[:10]
+                    content = memory.get("content", "")[:100]
+                    timestamp = memory.get("timestamp", "")[:10]
                     print(f"   💭 {content}... ({timestamp})")
                 return memories
             else:
@@ -86,18 +88,19 @@ async def show_user_memories(user_id: str, query: str = ""):
             print(f"   ❌ Connection error: {e}")
             return []
 
+
 async def show_user_messages(user_id: str, limit: int = 10):
     print(f"💬 Last {limit} messages from user {user_id}:")
-    
+
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(f"{BASE_URL}/debug/users/{user_id}/messages?limit={limit}")
             if response.status_code == 200:
                 messages = response.json()
                 for msg in messages:
-                    content = msg.get('content', '')[:80]
-                    timestamp = msg.get('timestamp', '')[:16]
-                    msg_type = msg.get('message_type', 'text')
+                    content = msg.get("content", "")[:80]
+                    timestamp = msg.get("timestamp", "")[:16]
+                    msg_type = msg.get("message_type", "text")
                     print(f"   💬 [{timestamp}] ({msg_type}) {content}...")
                 return messages
             else:
@@ -107,34 +110,36 @@ async def show_user_messages(user_id: str, limit: int = 10):
             print(f"   ❌ Connection error: {e}")
             return []
 
+
 async def test_memory_search(query: str):
     """Test memory search."""
     print(f"🔍 Testing memory search for '{query}':")
-    
+
     # First, get some users to test with
     users = await list_users(3)
     if not users:
         print("   ❌ No users found")
         return
-    
+
     for user in users[:2]:  # Test with first 2 users
-        user_id = user['id']
+        user_id = user["id"]
         memories = await show_user_memories(user_id, query)
         if memories:
             print(f"   ✅ Found {len(memories)} memories for user {user_id[:8]}")
 
+
 async def show_recent_activity(limit: int = 10):
     print(f"⏰ Last {limit} interactions:")
-    
+
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(f"{BASE_URL}/debug/recent-activity?limit={limit}")
             if response.status_code == 200:
                 activities = response.json()
                 for activity in activities:
-                    content = activity.get('content', '')[:60]
-                    timestamp = activity.get('timestamp', '')[:16]
-                    user_phone = activity.get('user_phone', 'Unknown')
+                    content = activity.get("content", "")[:60]
+                    timestamp = activity.get("timestamp", "")[:16]
+                    user_phone = activity.get("user_phone", "Unknown")
                     print(f"   📱 [{timestamp}] {user_phone}: {content}...")
                 return activities
             else:
@@ -144,10 +149,11 @@ async def show_recent_activity(limit: int = 10):
             print(f"   ❌ Connection error: {e}")
             return []
 
+
 async def health_check():
     """Check system health."""
     print("🏥 System health check:")
-    
+
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(f"{BASE_URL}/debug/health")
@@ -165,26 +171,28 @@ async def health_check():
             print(f"   ❌ Connection error: {e}")
             return None
 
+
 async def analyze_first_user():
     """Detailed analysis of the first user."""
     users = await list_users(1)
     if not users:
         print("❌ No users found")
         return
-    
+
     user = users[0]
-    user_id = user['id']
-    
+    user_id = user["id"]
+
     print("🔍 Detailed analysis of first user:")
     print(f"   ID: {user_id}")
     print(f"   Phone: {user.get('phone_number', 'Unknown')}")
     print(f"   Name: {user.get('name') or 'Unnamed'}")
-    
+
     # Get their messages
     await show_user_messages(user_id, 5)
-    
+
     # Get their memories
     await show_user_memories(user_id)
+
 
 async def main():
     """Main function with interactive menu."""
@@ -203,24 +211,24 @@ async def main():
         else:
             print(f"Unknown command: {command}")
         return
-    
+
     # Interactive menu
     while True:
-        print("\n" + "="*50)
+        print("\n" + "=" * 50)
         print("🔧 JOI DEBUG TOOLS")
-        print("="*50)
+        print("=" * 50)
         print("1. 🏥 Health check")
         print("2. 📊 Show statistics")
         print("3. 👥 List users")
         print("4. 💬 Show user messages")
-        print("5. 🧠 Show user memories") 
+        print("5. 🧠 Show user memories")
         print("6. 🔍 Test memory search")
         print("7. ⏰ Recent activity")
         print("8. 🔍 Analyze first user")
         print("0. 🚪 Exit")
-        
+
         choice = input("\nSelect an option: ").strip()
-        
+
         if choice == "0":
             print("👋 Goodbye!")
             break
@@ -248,5 +256,6 @@ async def main():
         else:
             print("❌ Invalid option")
 
+
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    asyncio.run(main())

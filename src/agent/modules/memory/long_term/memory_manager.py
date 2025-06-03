@@ -41,7 +41,7 @@ class MemoryManager:
 
     async def extract_and_store_memories(self, message: BaseMessage, user_id: str, session_id: str) -> None:
         """Extract important information from a message and store in vector store.
-        
+
         Args:
             message: The message to analyze
             user_id: The user ID who sent the message
@@ -77,11 +77,11 @@ class MemoryManager:
 
     def get_relevant_memories(self, context: str, user_id: str) -> List[str]:
         """Retrieve relevant memories based on the current context for a specific user.
-        
+
         Args:
             context: The context to search for relevant memories
             user_id: The user ID to filter memories by
-            
+
         Returns:
             List of relevant memory texts for the user
         """
@@ -103,10 +103,10 @@ class MemoryManager:
 
     def get_user_memory_stats(self, user_id: str) -> dict:
         """Get memory statistics for a user.
-        
+
         Args:
             user_id: The user ID to get stats for
-            
+
         Returns:
             Dictionary with memory statistics
         """
@@ -122,10 +122,10 @@ class MemoryManager:
 
     def delete_user_memories(self, user_id: str) -> int:
         """Delete all memories for a user (GDPR compliance).
-        
+
         Args:
             user_id: The user ID whose memories should be deleted
-            
+
         Returns:
             Number of memories deleted
         """

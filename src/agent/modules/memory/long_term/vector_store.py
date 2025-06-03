@@ -6,7 +6,15 @@ from typing import List, Optional
 
 from agent.settings import settings
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, PointStruct, VectorParams, Filter, FieldCondition, MatchValue, PayloadSchemaType
+from qdrant_client.models import (
+    Distance,
+    FieldCondition,
+    Filter,
+    MatchValue,
+    PayloadSchemaType,
+    PointStruct,
+    VectorParams,
+)
 from sentence_transformers import SentenceTransformer
 
 
@@ -80,19 +88,15 @@ class VectorStore:
                 distance=Distance.COSINE,
             ),
         )
-        
+
         # Create index for user_id field to enable filtering
         self.client.create_payload_index(
-            collection_name=self.COLLECTION_NAME,
-            field_name="user_id",
-            field_schema=PayloadSchemaType.KEYWORD
+            collection_name=self.COLLECTION_NAME, field_name="user_id", field_schema=PayloadSchemaType.KEYWORD
         )
-        
+
         # Create index for session_id field as well
         self.client.create_payload_index(
-            collection_name=self.COLLECTION_NAME,
-            field_name="session_id", 
-            field_schema=PayloadSchemaType.KEYWORD
+            collection_name=self.COLLECTION_NAME, field_name="session_id", field_schema=PayloadSchemaType.KEYWORD
         )
 
     def find_similar_memory(self, text: str, user_id: str) -> Optional[Memory]:
@@ -161,16 +165,9 @@ class VectorStore:
             return []
 
         query_embedding = self.model.encode(query)
-        
+
         # Create filter for user_id
-        user_filter = Filter(
-            must=[
-                FieldCondition(
-                    key="user_id",
-                    match=MatchValue(value=user_id)
-                )
-            ]
-        )
+        user_filter = Filter(must=[FieldCondition(key="user_id", match=MatchValue(value=user_id))])
 
         results = self.client.search(
             collection_name=self.COLLECTION_NAME,
@@ -200,20 +197,13 @@ class VectorStore:
         if not self._collection_exists():
             return 0
 
-        user_filter = Filter(
-            must=[
-                FieldCondition(
-                    key="user_id",
-                    match=MatchValue(value=user_id)
-                )
-            ]
-        )
+        user_filter = Filter(must=[FieldCondition(key="user_id", match=MatchValue(value=user_id))])
 
         result = self.client.count(
             collection_name=self.COLLECTION_NAME,
             count_filter=user_filter,
         )
-        
+
         return result.count
 
     def delete_user_memories(self, user_id: str) -> int:
@@ -228,14 +218,7 @@ class VectorStore:
         if not self._collection_exists():
             return 0
 
-        user_filter = Filter(
-            must=[
-                FieldCondition(
-                    key="user_id",
-                    match=MatchValue(value=user_id)
-                )
-            ]
-        )
+        user_filter = Filter(must=[FieldCondition(key="user_id", match=MatchValue(value=user_id))])
 
         # First count how many we'll delete
         count_result = self.client.count(

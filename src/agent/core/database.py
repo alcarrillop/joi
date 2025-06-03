@@ -1,19 +1,20 @@
 """
 Database configuration for PostgreSQL checkpointer with automatic setup
 """
-import os
+
 import asyncio
-import asyncpg
-import uuid
 import json
-from datetime import datetime
+import os
+import uuid
 from functools import lru_cache
 from pathlib import Path
+
+import asyncpg
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from agent.settings import settings
 
 # Global flag to track if setup has been done
 _setup_done = False
+
 
 @lru_cache
 def get_database_url() -> str:
@@ -27,14 +28,14 @@ def get_database_url() -> str:
 async def execute_sql_script(script_path: str):
     """Execute a SQL script file against the database."""
     database_url = get_database_url()
-    
+
     # Read the SQL script
     script_file = Path(script_path)
     if not script_file.exists():
         raise FileNotFoundError(f"SQL script not found: {script_path}")
-    
-    sql_content = script_file.read_text(encoding='utf-8')
-    
+
+    sql_content = script_file.read_text(encoding="utf-8")
+
     # Connect and execute
     conn = await asyncpg.connect(database_url)
     try:
@@ -56,43 +57,61 @@ async def ensure_tables_exist():
         checkpointer = AsyncPostgresSaver.from_conn_string(database_url)
         async with checkpointer as cp:
             await cp.setup()
-        
+
         # Execute our custom schema
         await execute_sql_script("scripts/init_db.sql")
         _setup_done = True
 
 
-async def get_or_create_user(phone_number: str) -> str:
+async def get_or_create_user(phone_number: str, name: str = None) -> str:
     """Get existing user or create new user by phone number."""
     database_url = get_database_url()
     conn = await asyncpg.connect(database_url)
-    
+
     try:
         # Try to find existing user
-        user = await conn.fetchrow(
-            "SELECT id FROM users WHERE phone_number = $1", 
-            phone_number
-        )
-        
+        user = await conn.fetchrow("SELECT id FROM users WHERE phone_number = $1", phone_number)
+
         if user:
-            return str(user['id'])
-        
-        # Create new user
+            # Update name if provided and not already set
+            if name:
+                await conn.execute(
+                    "UPDATE users SET name = $1 WHERE id = $2 AND (name IS NULL OR name = '')", name, user["id"]
+                )
+            return str(user["id"])
+
+        # Create new user with name if provided
         user_id = await conn.fetchval(
-            "INSERT INTO users (phone_number) VALUES ($1) RETURNING id",
-            phone_number
+            "INSERT INTO users (phone_number, name) VALUES ($1, $2) RETURNING id", phone_number, name
         )
-        
+
         # Create initial learning stats for new user
         await conn.execute(
-            """INSERT INTO learning_stats (user_id, vocab_learned, grammar_issues) 
+            """INSERT INTO learning_stats (user_id, vocab_learned, grammar_issues)
                VALUES ($1, $2, $3)""",
-            user_id, [], json.dumps({})
+            user_id,
+            [],
+            json.dumps({}),
         )
-        
-        print(f"✅ Created new user: {phone_number} with ID: {user_id}")
+
+        print(f"✅ Created new user: {phone_number} with ID: {user_id}" + (f" and name: {name}" if name else ""))
         return str(user_id)
-        
+
+    finally:
+        await conn.close()
+
+
+async def update_user_name(user_id: str, name: str):
+    """Update user name if not already set."""
+    database_url = get_database_url()
+    conn = await asyncpg.connect(database_url)
+
+    try:
+        await conn.execute(
+            "UPDATE users SET name = $1 WHERE id = $2 AND (name IS NULL OR name = '')", name, uuid.UUID(user_id)
+        )
+        print(f"✅ Updated name for user {user_id}: {name}")
+
     finally:
         await conn.close()
 
@@ -101,26 +120,22 @@ async def get_or_create_session(user_id: str) -> str:
     """Get active session or create new session for user."""
     database_url = get_database_url()
     conn = await asyncpg.connect(database_url)
-    
+
     try:
         # Try to find active session (ended_at is NULL)
         session = await conn.fetchrow(
-            "SELECT id FROM sessions WHERE user_id = $1 AND ended_at IS NULL",
-            uuid.UUID(user_id)
+            "SELECT id FROM sessions WHERE user_id = $1 AND ended_at IS NULL", uuid.UUID(user_id)
         )
-        
+
         if session:
-            return str(session['id'])
-        
+            return str(session["id"])
+
         # Create new session
-        session_id = await conn.fetchval(
-            "INSERT INTO sessions (user_id) VALUES ($1) RETURNING id",
-            uuid.UUID(user_id)
-        )
-        
+        session_id = await conn.fetchval("INSERT INTO sessions (user_id) VALUES ($1) RETURNING id", uuid.UUID(user_id))
+
         print(f"✅ Created new session: {session_id} for user: {user_id}")
         return str(session_id)
-        
+
     finally:
         await conn.close()
 
@@ -129,14 +144,16 @@ async def log_message(session_id: str, sender: str, message: str):
     """Log a message to the messages table."""
     database_url = get_database_url()
     conn = await asyncpg.connect(database_url)
-    
+
     try:
         await conn.execute(
             "INSERT INTO messages (session_id, sender, message) VALUES ($1, $2, $3)",
-            uuid.UUID(session_id), sender, message
+            uuid.UUID(session_id),
+            sender,
+            message,
         )
         print(f"✅ Logged {sender} message for session: {session_id}")
-        
+
     finally:
         await conn.close()
 
@@ -145,25 +162,25 @@ async def get_user_learning_stats(user_id: str) -> dict:
     """Get learning statistics for a user."""
     database_url = get_database_url()
     conn = await asyncpg.connect(database_url)
-    
+
     try:
         stats = await conn.fetchrow(
-            """SELECT u.current_level, ls.vocab_learned, ls.grammar_issues 
-               FROM users u 
-               LEFT JOIN learning_stats ls ON u.id = ls.user_id 
+            """SELECT u.current_level, ls.vocab_learned, ls.grammar_issues
+               FROM users u
+               LEFT JOIN learning_stats ls ON u.id = ls.user_id
                WHERE u.id = $1""",
-            uuid.UUID(user_id)
+            uuid.UUID(user_id),
         )
-        
+
         if stats:
             return {
-                'current_level': stats['current_level'] or 'A1',
-                'vocab_learned': stats['vocab_learned'] or [],
-                'grammar_issues': stats['grammar_issues'] or {}
+                "current_level": stats["current_level"] or "A1",
+                "vocab_learned": stats["vocab_learned"] or [],
+                "grammar_issues": stats["grammar_issues"] or {},
             }
-        
-        return {'current_level': 'A1', 'vocab_learned': [], 'grammar_issues': {}}
-        
+
+        return {"current_level": "A1", "vocab_learned": [], "grammar_issues": {}}
+
     finally:
         await conn.close()
 
@@ -172,13 +189,13 @@ async def get_checkpointer() -> AsyncPostgresSaver:
     """
     Get a PostgreSQL checkpointer instance with automatic table setup.
     This is the main function to use in the application.
-    
+
     Returns:
         AsyncPostgresSaver: Ready-to-use checkpointer with tables created
     """
     # Ensure tables exist first
     await ensure_tables_exist()
-    
+
     # Return a new checkpointer instance for use
     database_url = get_database_url()
     return AsyncPostgresSaver.from_conn_string(database_url)
@@ -187,7 +204,7 @@ async def get_checkpointer() -> AsyncPostgresSaver:
 async def test_checkpointer_connection():
     """Test that the checkpointer connection and setup works correctly."""
     try:
-        checkpointer = await get_checkpointer()
+        await get_checkpointer()
         print("✅ PostgreSQL checkpointer connection and setup successful!")
         return True
     except Exception as e:
@@ -197,4 +214,4 @@ async def test_checkpointer_connection():
 
 if __name__ == "__main__":
     # Test the connection and setup
-    asyncio.run(test_checkpointer_connection()) 
+    asyncio.run(test_checkpointer_connection())

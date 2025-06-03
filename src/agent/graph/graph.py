@@ -11,6 +11,7 @@ from agent.graph.nodes import (
     context_injection_node,
     conversation_node,
     image_node,
+    learning_stats_update_node,
     memory_extraction_node,
     memory_injection_node,
     router_node,
@@ -25,6 +26,7 @@ def create_workflow_graph():
 
     # Add all nodes
     graph_builder.add_node("memory_extraction_node", memory_extraction_node)
+    graph_builder.add_node("learning_stats_update_node", learning_stats_update_node)
     graph_builder.add_node("router_node", router_node)
     graph_builder.add_node("context_injection_node", context_injection_node)
     graph_builder.add_node("memory_injection_node", memory_injection_node)
@@ -37,8 +39,11 @@ def create_workflow_graph():
     # First extract memories from user message
     graph_builder.add_edge(START, "memory_extraction_node")
 
+    # Then update learning stats from user message
+    graph_builder.add_edge("memory_extraction_node", "learning_stats_update_node")
+
     # Then determine response type
-    graph_builder.add_edge("memory_extraction_node", "router_node")
+    graph_builder.add_edge("learning_stats_update_node", "router_node")
 
     # Then inject both context and memories
     graph_builder.add_edge("router_node", "context_injection_node")
