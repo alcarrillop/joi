@@ -7,6 +7,7 @@ from langchain_groq import ChatGroq
 from agent.modules.curriculum.curriculum_manager import get_curriculum_manager
 from agent.modules.image.image_to_text import ImageToText
 from agent.modules.image.text_to_image import TextToImage
+from agent.modules.learning.learning_stats_manager import get_learning_stats_manager
 from agent.modules.speech.text_to_speech import TextToSpeech
 from agent.settings import get_settings
 
@@ -53,13 +54,20 @@ async def get_user_level_info(user_id: str) -> str:
     """Get user's English level information for conversation context."""
     try:
         curriculum_manager = get_curriculum_manager()
+        learning_manager = get_learning_stats_manager()
+
+        # Get level progress from curriculum manager
         level_progress = await curriculum_manager.estimate_level_progress(user_id)
 
         if "error" in level_progress:
             return "I don't have enough information about your English level yet. Keep chatting with me so I can assess your vocabulary!"
 
+        # Get enhanced vocabulary statistics
+        vocab_summary = await learning_manager.get_learning_summary(user_id)
+        top_words = await learning_manager.get_user_top_words(user_id, limit=3)
+
         level = level_progress.get("estimated_level", "A1")
-        vocab_count = level_progress.get("vocabulary_learned", 0)
+        vocab_count = vocab_summary["vocabulary"]["total_words_learned"]
         next_level = level_progress.get("next_level")
         words_needed = level_progress.get("words_needed_for_next_level", 0)
         progress_percent = level_progress.get("progress_to_next_level", 0)
@@ -81,6 +89,13 @@ async def get_user_level_info(user_id: str) -> str:
         response += f"📚 **Vocabulary Learned:** {vocab_count} English words\n"
         response += f"💬 **Conversations:** {message_count} messages exchanged\n\n"
 
+        # Add top words with frequencies
+        if top_words:
+            response += "🔥 **Your Most Used Words:**\n"
+            for word_data in top_words:
+                response += f"   • {word_data['word']} ({word_data['frequency']} times)\n"
+            response += "\n"
+
         if next_level and words_needed > 0:
             response += f"🚀 **Next Goal:** Reach {next_level} level\n"
             response += f"📈 **Progress:** {progress_percent:.1f}% to {next_level}\n"
@@ -88,7 +103,7 @@ async def get_user_level_info(user_id: str) -> str:
         elif vocab_count >= 600:
             response += "🏆 **Congratulations!** You're at an advanced level!\n\n"
 
-        # Add some encouraging context based on level
+        # Add encouraging context based on level
         if vocab_count < 25:
             response += "Keep chatting with me! Every conversation teaches you new words. 🌱"
         elif vocab_count < 100:

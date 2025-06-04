@@ -6,7 +6,7 @@ Database Schema Update Script
 Ensures all required tables exist and have proper structure for the JOI system.
 This script:
 
-1. Ensures learning_stats table exists
+1. Ensures user_word_stats table exists
 2. Checks core database health
 3. Validates essential table structure
 
@@ -39,31 +39,31 @@ async def check_and_update_schema():
         # Check core essential tables after simplification
         print("\n📊 Checking essential tables...")
 
-        user_goals_exists = await conn.fetchval(
-            "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'learning_stats')"
+        user_word_stats_exists = await conn.fetchval(
+            "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'user_word_stats')"
         )
 
-        if user_goals_exists:
-            print("✅ learning_stats table exists")
+        if user_word_stats_exists:
+            print("✅ user_word_stats table exists")
 
             # Show table structure for verification
             columns = await conn.fetch("""
                 SELECT column_name, data_type, is_nullable
                 FROM information_schema.columns
-                WHERE table_name = 'learning_stats'
+                WHERE table_name = 'user_word_stats'
                 ORDER BY ordinal_position
             """)
 
-            print("📊 learning_stats table structure:")
+            print("📊 user_word_stats table structure:")
             for col in columns:
                 print(
                     f"  • {col['column_name']}: {col['data_type']} ({'NULL' if col['is_nullable'] == 'YES' else 'NOT NULL'})"
                 )
         else:
-            print("❌ learning_stats table missing - this should exist!")
+            print("❌ user_word_stats table missing - this should exist!")
 
         # Check all essential tables
-        expected_tables = ["users", "sessions", "messages", "learning_stats"]
+        expected_tables = ["users", "sessions", "messages", "user_word_stats"]
 
         print(f"\n🔍 Verifying {len(expected_tables)} essential tables...")
         for table in expected_tables:
@@ -81,7 +81,7 @@ async def check_and_update_schema():
                 print(f"❌ {table}: MISSING")
 
         print("\n🎯 Database schema check complete!")
-        print("📋 Essential tables for memory-focused system verified.")
+        print("📋 Essential tables for vocabulary tracking system verified.")
 
     except Exception as e:
         print(f"❌ Error checking schema: {e}")

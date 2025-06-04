@@ -52,12 +52,18 @@ async def router_node(state: AICompanionState):
     user_id = state.get("user_id", "unknown")
     workflow_logger.info(f"[ROUTER] Processing messages for user {user_id}")
 
-    chain = get_router_chain()
-    settings = get_settings()
-    response = await chain.ainvoke({"messages": state["messages"][-settings.ROUTER_MESSAGES_TO_ANALYZE :]})
+    try:
+        chain = get_router_chain()
+        settings = get_settings()
+        response = await chain.ainvoke({"messages": state["messages"][-settings.ROUTER_MESSAGES_TO_ANALYZE :]})
 
-    workflow_logger.info(f"[ROUTER] Selected workflow: {response.response_type} for user {user_id}")
-    return {"workflow": response.response_type}
+        workflow_logger.info(f"[ROUTER] Selected workflow: {response.response_type} for user {user_id}")
+        return {"workflow": response.response_type}
+
+    except Exception as e:
+        # Handle API failures gracefully by defaulting to conversation
+        workflow_logger.warning(f"[ROUTER] API error for user {user_id}, defaulting to conversation: {e}")
+        return {"workflow": "conversation"}
 
 
 def context_injection_node(state: AICompanionState):

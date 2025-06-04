@@ -88,14 +88,6 @@ async def get_or_create_user(phone_number: str, name: str = None) -> str:
             "INSERT INTO users (phone_number, name) VALUES ($1, $2) RETURNING id", phone_number, name
         )
 
-        # Create initial learning stats for new user
-        await conn.execute(
-            """INSERT INTO learning_stats (user_id, vocab_learned)
-               VALUES ($1, $2)""",
-            user_id,
-            [],
-        )
-
         print(f"✅ Created new user: {phone_number} with ID: {user_id}" + (f" and name: {name}" if name else ""))
         return str(user_id)
 
@@ -161,26 +153,20 @@ async def log_message(session_id: str, sender: str, message: str):
 
 
 async def get_user_stats(user_id: str) -> Dict:
-    """Get user learning statistics (vocabulary only)."""
+    """Get user learning statistics (vocabulary only) from the new user_word_stats table."""
     database_url = get_database_url()
     conn = await asyncpg.connect(database_url)
 
     try:
-        # Get learning stats from learning_stats table
-        stats = await conn.fetchrow(
-            """SELECT ls.vocab_learned
-            FROM learning_stats ls
-            WHERE ls.user_id = $1""",
+        # Get vocabulary from the new user_word_stats table
+        vocab_words = await conn.fetch(
+            "SELECT word FROM user_word_stats WHERE user_id = $1 ORDER BY word",
             uuid.UUID(user_id),
         )
 
-        if stats:
-            return {
-                "vocab_learned": stats["vocab_learned"] or [],
-            }
-
-        # Return default if no stats found
-        return {"vocab_learned": []}
+        return {
+            "vocab_learned": [row["word"] for row in vocab_words],
+        }
 
     except Exception as e:
         logger.error(f"Error getting user stats: {e}")

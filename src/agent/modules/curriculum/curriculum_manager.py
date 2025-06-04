@@ -7,6 +7,7 @@ Provides level estimation and progress tracking based on English vocabulary lear
 """
 
 import logging
+import uuid
 from typing import Dict, List, Optional
 
 import asyncpg
@@ -55,25 +56,23 @@ class SimplifiedCurriculumManager:
                 WHERE u.id = $1
                 GROUP BY u.id, u.created_at
                 """,
-                user_id,
+                uuid.UUID(user_id),
             )
 
             if not user_stats:
                 return {"error": "User not found"}
 
-            # Get vocabulary stats only
-            learning_stats = await conn.fetchrow("SELECT vocab_learned FROM learning_stats WHERE user_id = $1", user_id)
-
-            vocab_count = (
-                len(learning_stats["vocab_learned"]) if learning_stats and learning_stats["vocab_learned"] else 0
+            # Get vocabulary stats from the new user_word_stats table
+            vocab_count = await conn.fetchval(
+                "SELECT COUNT(*) FROM user_word_stats WHERE user_id = $1", uuid.UUID(user_id)
             )
 
             return {
                 "member_since": user_stats["created_at"],
                 "total_sessions": user_stats["total_sessions"] or 0,
                 "total_messages": user_stats["total_messages"] or 0,
-                "vocabulary_learned": vocab_count,
-                "has_learning_data": learning_stats is not None,
+                "vocabulary_learned": vocab_count or 0,
+                "has_learning_data": vocab_count > 0,
             }
 
         except Exception as e:

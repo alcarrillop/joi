@@ -52,12 +52,12 @@ class SystemStats(BaseModel):
     total_messages: int
     active_sessions: int
     total_memories: int
-    total_learning_stats: int
+    total_vocabulary_entries: int
 
 
 @debug_router.get("/stats", response_model=SystemStats)
 async def get_system_stats():
-    """Get general system statistics."""
+    """Get system-wide statistics."""
     database_url = get_database_url()
     conn = await asyncpg.connect(database_url)
 
@@ -67,7 +67,7 @@ async def get_system_stats():
         total_sessions = await conn.fetchval("SELECT COUNT(*) FROM sessions")
         total_messages = await conn.fetchval("SELECT COUNT(*) FROM messages")
         active_sessions = total_sessions  # All sessions are considered active now
-        total_learning_stats = await conn.fetchval("SELECT COUNT(*) FROM learning_stats")
+        total_vocabulary_entries = await conn.fetchval("SELECT COUNT(*) FROM user_word_stats")
 
         # Memory statistics
         memory_manager = get_memory_manager()
@@ -87,7 +87,7 @@ async def get_system_stats():
             total_messages=total_messages or 0,
             active_sessions=active_sessions or 0,
             total_memories=total_memories,
-            total_learning_stats=total_learning_stats or 0,
+            total_vocabulary_entries=total_vocabulary_entries or 0,
         )
     finally:
         await conn.close()
@@ -374,7 +374,7 @@ async def debug_dashboard():
         <div class="stats">
             <h2>📊 System Status</h2>
             <p><strong>Memory-Focused Architecture:</strong> Simplified for production</p>
-            <p><strong>Core Tables:</strong> users, sessions, messages, learning_stats</p>
+            <p><strong>Core Tables:</strong> users, sessions, messages, user_word_stats</p>
             <p><strong>Vector Store:</strong> Qdrant for semantic memory</p>
         </div>
 
