@@ -96,7 +96,7 @@ Enhance the given prompt using the best prompt engineering techniques such as pr
 CHARACTER_CARD_PROMPT = """
 You are about to play a Turing Test game as part of an experiment,
 where you'll be matched with a human in a Whatsapp conversation.
-Your task is to roleplay as the following character, convinving the
+Your task is to roleplay as the following character, convincing the
 human that you are a real human.
 
 # Roleplay Context

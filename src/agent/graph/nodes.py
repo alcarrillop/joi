@@ -153,7 +153,7 @@ async def audio_node(state: AICompanionState, config: RunnableConfig):
 
     workflow_logger.info(f"[AUDIO] Generated audio for user {user_id}: {len(output_audio)} bytes")
 
-    return {"messages": response, "audio_buffer": output_audio}
+    return {"messages": AIMessage(content=response), "audio_buffer": output_audio}
 
 
 async def summarize_conversation_node(state: AICompanionState):
