@@ -4,7 +4,7 @@ from datetime import datetime
 from functools import lru_cache
 from typing import List, Optional
 
-from agent.settings import settings
+from agent.settings import get_settings
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance,
@@ -64,6 +64,7 @@ class VectorStore:
         if not self._initialized:
             self._validate_env_vars()
             self.model = SentenceTransformer(self.EMBEDDING_MODEL)
+            settings = get_settings()
             self.client = QdrantClient(url=settings.QDRANT_URL, api_key=settings.QDRANT_API_KEY)
             self._initialized = True
 
@@ -199,15 +200,22 @@ class VectorStore:
 
         user_filter = Filter(must=[FieldCondition(key="user_id", match=MatchValue(value=user_id))])
 
-        result = self.client.count(
+        collection_info = self.client.get_collection(self.COLLECTION_NAME)
+        if collection_info.points_count == 0:
+            return 0
+
+        # Count points with the user filter
+        results = self.client.search(
             collection_name=self.COLLECTION_NAME,
-            count_filter=user_filter,
+            query_vector=[0] * 384,  # Dummy vector for counting
+            query_filter=user_filter,
+            limit=10000,  # Large limit to get all matches
         )
 
-        return result.count
+        return len(results)
 
     def delete_user_memories(self, user_id: str) -> int:
-        """Delete all memories for a specific user (GDPR compliance).
+        """Delete all memories for a specific user.
 
         Args:
             user_id: The user ID whose memories should be deleted
@@ -218,24 +226,26 @@ class VectorStore:
         if not self._collection_exists():
             return 0
 
+        # Get all memories for the user first to count them
         user_filter = Filter(must=[FieldCondition(key="user_id", match=MatchValue(value=user_id))])
 
-        # First count how many we'll delete
-        count_result = self.client.count(
+        memories_before = self.client.search(
             collection_name=self.COLLECTION_NAME,
-            count_filter=user_filter,
+            query_vector=[0] * 384,  # Dummy vector
+            query_filter=user_filter,
+            limit=10000,  # Large limit to get all matches
         )
 
-        # Delete the points
-        self.client.delete(
-            collection_name=self.COLLECTION_NAME,
-            points_selector=user_filter,
-        )
+        memories_count = len(memories_before)
 
-        return count_result.count
+        if memories_count > 0:
+            # Delete points with the user filter
+            self.client.delete(collection_name=self.COLLECTION_NAME, points_selector=user_filter)
+
+        return memories_count
 
 
 @lru_cache
 def get_vector_store() -> VectorStore:
-    """Get or create the VectorStore singleton instance."""
+    """Get singleton instance of VectorStore."""
     return VectorStore()
