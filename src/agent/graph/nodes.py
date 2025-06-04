@@ -29,6 +29,7 @@ from agent.graph.utils.helpers import (
     get_chat_model,
     get_text_to_image_module,
     get_text_to_speech_module,
+    get_user_level_info,
 )
 from agent.modules.learning.learning_stats_manager import get_learning_stats_manager
 from agent.modules.memory.long_term.memory_manager import get_memory_manager
@@ -82,6 +83,40 @@ async def conversation_node(state: AICompanionState, config: RunnableConfig):
     memory_context = state.get("memory_context", "")
 
     workflow_logger.debug(f"[CONVERSATION] Memory context length for user {user_id}: {len(memory_context)} chars")
+
+    # Check if user is asking about their English level or vocabulary progress
+    last_human_message = None
+    for msg in reversed(state["messages"]):
+        if msg.type == "human":
+            last_human_message = msg
+            break
+
+    level_keywords = ["level", "assessment", "progress", "how good", "evaluate", "skill", "current level"]
+    english_keywords = ["english", "my english"]
+    vocab_keywords = ["words", "vocabulary", "vocab", "learned", "learning", "how many words"]
+
+    if last_human_message:
+        message_lower = last_human_message.content.lower()
+
+        # Check for level-related questions
+        is_level_question = any(keyword in message_lower for keyword in level_keywords) and any(
+            keyword in message_lower for keyword in english_keywords
+        )
+
+        # Check for vocabulary-related questions
+        is_vocab_question = any(keyword in message_lower for keyword in vocab_keywords) and (
+            "learned" in message_lower or "learning" in message_lower or "many" in message_lower
+        )
+
+        if is_level_question or is_vocab_question:
+            # User is asking about their English level or vocabulary progress
+            try:
+                level_info = await get_user_level_info(user_id)
+                workflow_logger.info(f"[CONVERSATION] Provided curriculum-based level assessment for user {user_id}")
+                return {"messages": AIMessage(content=level_info)}
+            except Exception as e:
+                workflow_logger.warning(f"[CONVERSATION] Failed to get level info for user {user_id}: {e}")
+                # Fall through to normal conversation
 
     chain = get_character_response_chain(state.get("summary", ""))
 
@@ -376,6 +411,42 @@ async def conversation(state: AICompanionState) -> AICompanionState:
     # Get user context
     user_id = state.get("user_id", "unknown")
     memory_context = state.get("memory_context", "")
+
+    # Check if user is asking about their English level or vocabulary progress
+    last_human_message = None
+    for msg in reversed(state["messages"]):
+        if msg.type == "human":
+            last_human_message = msg
+            break
+
+    level_keywords = ["level", "assessment", "progress", "how good", "evaluate", "skill", "current level"]
+    english_keywords = ["english", "my english"]
+    vocab_keywords = ["words", "vocabulary", "vocab", "learned", "learning", "how many words"]
+
+    if last_human_message:
+        message_lower = last_human_message.content.lower()
+
+        # Check for level-related questions
+        is_level_question = any(keyword in message_lower for keyword in level_keywords) and any(
+            keyword in message_lower for keyword in english_keywords
+        )
+
+        # Check for vocabulary-related questions
+        is_vocab_question = any(keyword in message_lower for keyword in vocab_keywords) and (
+            "learned" in message_lower or "learning" in message_lower or "many" in message_lower
+        )
+
+        if is_level_question or is_vocab_question:
+            # User is asking about their English level or vocabulary progress
+            try:
+                level_info = await get_user_level_info(user_id)
+                ai_message = AIMessage(content=level_info)
+                state["messages"].append(ai_message)
+                workflow_logger.info("Provided curriculum-based level assessment")
+                return state
+            except Exception as e:
+                workflow_logger.warning(f"Failed to get level info: {e}")
+                # Fall through to normal conversation
 
     # Create conversation LLM
     settings = get_settings()

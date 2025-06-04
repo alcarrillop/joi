@@ -3,7 +3,6 @@ Database configuration for PostgreSQL checkpointer with automatic setup
 """
 
 import asyncio
-import json
 import logging
 import os
 import uuid
@@ -91,11 +90,10 @@ async def get_or_create_user(phone_number: str, name: str = None) -> str:
 
         # Create initial learning stats for new user
         await conn.execute(
-            """INSERT INTO learning_stats (user_id, vocab_learned, grammar_issues)
-               VALUES ($1, $2, $3)""",
+            """INSERT INTO learning_stats (user_id, vocab_learned)
+               VALUES ($1, $2)""",
             user_id,
             [],
-            json.dumps({}),
         )
 
         print(f"✅ Created new user: {phone_number} with ID: {user_id}" + (f" and name: {name}" if name else ""))
@@ -163,14 +161,14 @@ async def log_message(session_id: str, sender: str, message: str):
 
 
 async def get_user_stats(user_id: str) -> Dict:
-    """Get user learning statistics."""
+    """Get user learning statistics (vocabulary only)."""
     database_url = get_database_url()
     conn = await asyncpg.connect(database_url)
 
     try:
         # Get learning stats from learning_stats table
         stats = await conn.fetchrow(
-            """SELECT ls.vocab_learned, ls.grammar_issues
+            """SELECT ls.vocab_learned
             FROM learning_stats ls
             WHERE ls.user_id = $1""",
             uuid.UUID(user_id),
@@ -179,15 +177,14 @@ async def get_user_stats(user_id: str) -> Dict:
         if stats:
             return {
                 "vocab_learned": stats["vocab_learned"] or [],
-                "grammar_issues": stats["grammar_issues"] or {},
             }
 
         # Return default if no stats found
-        return {"vocab_learned": [], "grammar_issues": {}}
+        return {"vocab_learned": []}
 
     except Exception as e:
         logger.error(f"Error getting user stats: {e}")
-        return {"vocab_learned": [], "grammar_issues": {}}
+        return {"vocab_learned": []}
     finally:
         await conn.close()
 

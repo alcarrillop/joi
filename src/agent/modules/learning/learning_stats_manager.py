@@ -2,15 +2,14 @@
 Learning Stats Manager
 =====================
 
-Manages vocabulary learning and grammar error detection.
-Updates learning_stats table with user progress.
+Manages vocabulary learning tracking for English words only.
+Updates learning_stats table with user vocabulary progress.
 """
 
-import json
 import logging
 import re
 import uuid
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import asyncpg
 from langchain_groq import ChatGroq
@@ -30,25 +29,16 @@ class VocabularyAnalysis(BaseModel):
     basic_words: List[str]
 
 
-class GrammarAnalysis(BaseModel):
-    """Analysis of grammar errors in a message."""
-
-    has_errors: bool
-    error_types: List[str]
-    error_descriptions: List[str]
-    corrected_text: Optional[str] = None
-
-
 class LearningStatsManager:
-    """Manages learning statistics for users."""
+    """Manages learning statistics for users - vocabulary only."""
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+        self.settings = get_settings()
         self.llm = ChatGroq(
-            model=get_settings().SMALL_TEXT_MODEL_NAME,
-            api_key=get_settings().GROQ_API_KEY,
-            temperature=0.1,
-            max_retries=2,
+            model=self.settings.TEXT_MODEL_NAME,
+            api_key=self.settings.GROQ_API_KEY,
+            temperature=0.3,
         )
 
         # Basic vocabulary for beginners (A1-A2 level)
@@ -60,75 +50,77 @@ class LearningStatsManager:
             "please",
             "thank",
             "you",
+            "welcome",
+            "sorry",
+            "excuse",
+            "help",
+            "understand",
+            "speak",
+            "english",
+            "learning",
+            "practice",
+            "study",
             "name",
             "age",
             "from",
             "live",
             "work",
-            "study",
-            "like",
-            "love",
-            "food",
-            "water",
-            "house",
+            "home",
             "family",
             "friend",
             "time",
-            "day",
-            "week",
-            "month",
-            "year",
             "today",
             "tomorrow",
             "yesterday",
-            "good",
-            "bad",
-            "happy",
-            "sad",
-            "big",
-            "small",
-            "new",
-            "old",
-            "hot",
-            "cold",
-            "red",
-            "blue",
-            "green",
-            "white",
-            "black",
-            "one",
-            "two",
-            "three",
-            "four",
-            "five",
-            "ten",
-            "money",
+            "morning",
+            "afternoon",
+            "evening",
+            "night",
+            "week",
+            "month",
+            "year",
+            "food",
+            "water",
+            "coffee",
+            "tea",
             "book",
-            "car",
             "phone",
             "computer",
-            "english",
-            "spanish",
-            "language",
-            "learn",
-            "teach",
-            "speak",
+            "car",
+            "house",
+            "city",
+            "country",
+            "good",
+            "bad",
+            "nice",
+            "beautiful",
+            "big",
+            "small",
+            "hot",
+            "cold",
+            "happy",
+            "sad",
+            "tired",
+            "hungry",
+            "thirsty",
+            "like",
+            "love",
+            "want",
+            "need",
+            "have",
+            "get",
+            "go",
+            "come",
+            "see",
+            "hear",
+            "talk",
             "listen",
             "read",
             "write",
-            "understand",
-            "help",
-            "know",
-            "think",
-            "feel",
-            "want",
-            "need",
-            "come",
-            "go",
-            "see",
-            "hear",
             "eat",
             "drink",
+            "walk",
+            "run",
             "sleep",
             "wake",
             "open",
@@ -339,52 +331,6 @@ class LearningStatsManager:
             basic_words=basic_words[:15],
         )
 
-    async def analyze_grammar(self, text: str) -> GrammarAnalysis:
-        """Analyze grammar errors in the text using LLM."""
-        if len(text.strip()) < 5:
-            return GrammarAnalysis(has_errors=False, error_types=[], error_descriptions=[])
-
-        prompt = f"""
-Analyze this English text for grammar errors:
-
-Text: "{text}"
-
-Return a JSON with:
-1. has_errors: true/false
-2. error_types: list of error types (e.g., ["verb_tense", "subject_verb_agreement", "article_usage"])
-3. error_descriptions: list of brief descriptions of each error
-4. corrected_text: corrected version if errors exist
-
-Only identify clear, obvious grammar errors. Don't be overly strict with informal conversation.
-
-JSON:"""
-
-        try:
-            response = await self.llm.ainvoke(prompt)
-
-            # Try to extract JSON from response
-            response_text = str(response.content) if hasattr(response, "content") else str(response)
-
-            # Find JSON in response
-            json_start = response_text.find("{")
-            json_end = response_text.rfind("}") + 1
-
-            if json_start >= 0 and json_end > json_start:
-                json_text = response_text[json_start:json_end]
-                result = json.loads(json_text)
-
-                return GrammarAnalysis(
-                    has_errors=result.get("has_errors", False),
-                    error_types=result.get("error_types", []),
-                    error_descriptions=result.get("error_descriptions", []),
-                    corrected_text=result.get("corrected_text"),
-                )
-
-        except Exception as e:
-            self.logger.warning(f"Grammar analysis failed: {e}")
-
-        return GrammarAnalysis(has_errors=False, error_types=[], error_descriptions=[])
-
     def _extract_words(self, text: str) -> List[str]:
         """Extract meaningful words from text."""
         # Remove punctuation and split into words
@@ -465,21 +411,20 @@ JSON:"""
         self.logger.info(f"Updating learning stats for user {user_id}")
 
         try:
-            # Analyze the message
+            # Analyze the message vocabulary only
             vocab_analysis = await self.analyze_vocabulary(message_text)
-            grammar_analysis = await self.analyze_grammar(message_text)
 
             # Get existing vocabulary
             learned_vocab = await self.get_user_learned_vocabulary(user_id)
 
-            # Find truly new vocabulary
+            # Find truly new vocabulary (English words only)
             new_vocab = []
             for word in vocab_analysis.new_words:
                 if word.lower() not in [v.lower() for v in learned_vocab]:
                     new_vocab.append(word)
 
-            # Update database
-            await self._update_database_stats(user_id, new_vocab, grammar_analysis)
+            # Update database with new vocabulary only
+            await self._update_database_stats(user_id, new_vocab)
 
             stats = {
                 "vocabulary_analysis": {
@@ -488,124 +433,76 @@ JSON:"""
                     "advanced_words": vocab_analysis.advanced_words,
                     "total_learned": len(learned_vocab) + len(new_vocab),
                 },
-                "grammar_analysis": {
-                    "has_errors": grammar_analysis.has_errors,
-                    "error_count": len(grammar_analysis.error_types),
-                    "error_types": grammar_analysis.error_types,
-                },
             }
 
-            self.logger.info(
-                f"Learning stats updated for user {user_id}: {len(new_vocab)} new words, {len(grammar_analysis.error_types)} grammar issues"
-            )
+            self.logger.info(f"Learning stats updated for user {user_id}: {len(new_vocab)} new words")
             return stats
 
         except Exception as e:
             self.logger.error(f"Failed to update learning stats for user {user_id}: {e}")
             return {"error": str(e)}
 
-    async def _update_database_stats(self, user_id: str, new_vocab: List[str], grammar_analysis: GrammarAnalysis):
-        """Update the learning_stats table in database."""
+    async def _update_database_stats(self, user_id: str, new_vocab: List[str]):
+        """Update the learning_stats table with new vocabulary only."""
         database_url = get_database_url()
         conn = await asyncpg.connect(database_url)
 
         try:
-            # Get current stats
+            # Get current vocabulary
             current_stats = await conn.fetchrow(
-                "SELECT vocab_learned, grammar_issues FROM learning_stats WHERE user_id = $1", uuid.UUID(user_id)
+                "SELECT vocab_learned FROM learning_stats WHERE user_id = $1", uuid.UUID(user_id)
             )
 
             if current_stats:
                 # Update existing stats
                 current_vocab = current_stats["vocab_learned"] or []
-                current_grammar_str = current_stats["grammar_issues"] or "{}"
-
-                # Parse JSON string to dict
-                try:
-                    current_grammar = (
-                        json.loads(current_grammar_str) if isinstance(current_grammar_str, str) else current_grammar_str
-                    )
-                except (json.JSONDecodeError, TypeError):
-                    current_grammar = {}
-
                 # Add new vocabulary
                 updated_vocab = current_vocab + new_vocab
-
-                # Update grammar issues
-                updated_grammar = dict(current_grammar) if isinstance(current_grammar, dict) else {}
-                if grammar_analysis.has_errors:
-                    for error_type in grammar_analysis.error_types:
-                        updated_grammar[error_type] = updated_grammar.get(error_type, 0) + 1
 
                 # Update database
                 await conn.execute(
                     """UPDATE learning_stats
-                       SET vocab_learned = $1, grammar_issues = $2, last_updated = now()
-                       WHERE user_id = $3""",
+                       SET vocab_learned = $1, last_updated = now()
+                       WHERE user_id = $2""",
                     updated_vocab,
-                    json.dumps(updated_grammar),
                     uuid.UUID(user_id),
                 )
 
             else:
                 # Create new stats entry
-                grammar_dict = {}
-                if grammar_analysis.has_errors:
-                    for error_type in grammar_analysis.error_types:
-                        grammar_dict[error_type] = 1
-
                 await conn.execute(
-                    """INSERT INTO learning_stats (user_id, vocab_learned, grammar_issues, last_updated)
-                       VALUES ($1, $2, $3, now())""",
+                    """INSERT INTO learning_stats (user_id, vocab_learned, last_updated)
+                       VALUES ($1, $2, now())""",
                     uuid.UUID(user_id),
                     new_vocab,
-                    json.dumps(grammar_dict),
                 )
 
         finally:
             await conn.close()
 
     async def get_learning_summary(self, user_id: str) -> Dict:
-        """Get a summary of user's learning progress."""
+        """Get a summary of user's learning progress (vocabulary only)."""
         database_url = get_database_url()
         conn = await asyncpg.connect(database_url)
 
         try:
             stats = await conn.fetchrow(
-                "SELECT vocab_learned, grammar_issues, last_updated FROM learning_stats WHERE user_id = $1",
+                "SELECT vocab_learned, last_updated FROM learning_stats WHERE user_id = $1",
                 uuid.UUID(user_id),
             )
 
             if stats:
                 vocab_count = len(stats["vocab_learned"] or [])
-                grammar_issues_str = stats["grammar_issues"] or "{}"
-
-                # Parse JSON string to dict
-                try:
-                    grammar_issues = (
-                        json.loads(grammar_issues_str) if isinstance(grammar_issues_str, str) else grammar_issues_str
-                    )
-                except (json.JSONDecodeError, TypeError):
-                    grammar_issues = {}
-
-                total_grammar_errors = sum(grammar_issues.values()) if isinstance(grammar_issues, dict) else 0
 
                 return {
                     "vocabulary": {
                         "total_words_learned": vocab_count,
                         "recent_words": (stats["vocab_learned"] or [])[-5:] if stats["vocab_learned"] else [],
                     },
-                    "grammar": {
-                        "total_errors_identified": total_grammar_errors,
-                        "error_breakdown": grammar_issues,
-                        "most_common_error": max(grammar_issues, key=grammar_issues.get)
-                        if grammar_issues and isinstance(grammar_issues, dict)
-                        else None,
-                    },
                     "last_updated": stats["last_updated"],
                 }
 
-            return {"vocabulary": {"total_words_learned": 0}, "grammar": {"total_errors_identified": 0}}
+            return {"vocabulary": {"total_words_learned": 0}}
 
         finally:
             await conn.close()

@@ -2,8 +2,8 @@
 Simplified Curriculum Manager
 ============================
 
-Lightweight curriculum management focused on memory and basic learning tracking.
-Removed complex competency and assessment systems to focus on essential functionality.
+Lightweight curriculum management focused on vocabulary tracking only.
+Provides level estimation and progress tracking based on English vocabulary learned.
 """
 
 import logging
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class SimplifiedCurriculumManager:
-    """Simplified curriculum manager focused on memory and basic learning."""
+    """Simplified curriculum manager focused on vocabulary learning only."""
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
@@ -61,10 +61,8 @@ class SimplifiedCurriculumManager:
             if not user_stats:
                 return {"error": "User not found"}
 
-            # Get learning stats if available
-            learning_stats = await conn.fetchrow(
-                "SELECT vocab_learned, grammar_issues FROM learning_stats WHERE user_id = $1", user_id
-            )
+            # Get vocabulary stats only
+            learning_stats = await conn.fetchrow("SELECT vocab_learned FROM learning_stats WHERE user_id = $1", user_id)
 
             vocab_count = (
                 len(learning_stats["vocab_learned"]) if learning_stats and learning_stats["vocab_learned"] else 0
@@ -85,7 +83,7 @@ class SimplifiedCurriculumManager:
             await conn.close()
 
     async def estimate_level_progress(self, user_id: str) -> Dict:
-        """Estimate learning progress based on vocabulary and messages."""
+        """Estimate learning progress based on vocabulary learned."""
         try:
             stats = await self.get_learning_statistics(user_id)
 
@@ -93,27 +91,41 @@ class SimplifiedCurriculumManager:
             vocab_count = stats.get("vocabulary_learned", 0)
             message_count = stats.get("total_messages", 0)
 
-            # Basic level estimation thresholds
-            if vocab_count >= 500 and message_count >= 300:
+            # CEFR level estimation based on vocabulary thresholds
+            if vocab_count >= 400 and message_count >= 250:
                 estimated_level = "C1"
-            elif vocab_count >= 350 and message_count >= 200:
+            elif vocab_count >= 250 and message_count >= 150:
                 estimated_level = "B2"
-            elif vocab_count >= 200 and message_count >= 100:
+            elif vocab_count >= 150 and message_count >= 80:
                 estimated_level = "B1"
-            elif vocab_count >= 100 and message_count >= 50:
+            elif vocab_count >= 75 and message_count >= 30:
                 estimated_level = "A2"
             else:
                 estimated_level = "A1"
 
             next_level = self.get_next_level(estimated_level)
 
+            # Calculate progress to next level
+            level_thresholds = {"A1": 75, "A2": 150, "B1": 250, "B2": 400, "C1": 600, "C2": 800}
+
+            current_threshold = level_thresholds.get(estimated_level, 0)
+            next_threshold = level_thresholds.get(next_level, current_threshold) if next_level else current_threshold
+
+            progress_to_next = 0
+            if next_level and next_threshold > current_threshold:
+                progress_to_next = min(
+                    100, ((vocab_count - current_threshold) / (next_threshold - current_threshold)) * 100
+                )
+
             return {
                 "estimated_level": estimated_level,
                 "next_level": next_level,
                 "vocabulary_learned": vocab_count,
                 "total_messages": message_count,
+                "progress_to_next_level": max(0, progress_to_next),
+                "words_needed_for_next_level": max(0, next_threshold - vocab_count) if next_level else 0,
                 "progress_indicators": {
-                    "vocabulary_strength": min(100, (vocab_count / 500) * 100),
+                    "vocabulary_strength": min(100, (vocab_count / 600) * 100),  # Max at C1 level
                     "conversation_practice": min(100, (message_count / 300) * 100),
                 },
             }

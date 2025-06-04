@@ -33,7 +33,6 @@ CREATE TABLE IF NOT EXISTS learning_stats (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id),
     vocab_learned TEXT[],
-    grammar_issues JSONB,
     last_updated TIMESTAMPTZ DEFAULT now()
 );
 
@@ -48,7 +47,6 @@ CREATE INDEX IF NOT EXISTS idx_learning_stats_user_id ON learning_stats(user_id)
 COMMENT ON TABLE users IS 'Usuarios registrados del sistema de aprendizaje';
 COMMENT ON TABLE sessions IS 'Sesiones de conversación simplificadas para agrupar mensajes';
 COMMENT ON TABLE messages IS 'Mensajes individuales dentro de sesiones';
-COMMENT ON TABLE learning_stats IS 'Estadísticas y progreso de aprendizaje por usuario';
+COMMENT ON TABLE learning_stats IS 'Estadísticas de vocabulario y progreso de aprendizaje por usuario';
 
-COMMENT ON COLUMN learning_stats.vocab_learned IS 'Array de vocabulario aprendido por el usuario';
-COMMENT ON COLUMN learning_stats.grammar_issues IS 'Errores gramaticales frecuentes en formato JSON'; 
+COMMENT ON COLUMN learning_stats.vocab_learned IS 'Array de vocabulario en inglés aprendido por el usuario'; 
