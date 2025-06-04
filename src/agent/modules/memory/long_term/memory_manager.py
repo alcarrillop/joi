@@ -5,6 +5,7 @@ from typing import List, Optional
 
 from agent.core.prompts import MEMORY_ANALYSIS_PROMPT
 from agent.modules.memory.long_term.vector_store import get_vector_store
+from agent.modules.memory.long_term.vector_store_async import get_async_vector_store
 from agent.settings import get_settings
 from langchain_core.messages import BaseMessage
 from langchain_groq import ChatGroq
@@ -24,8 +25,8 @@ class MemoryAnalysis(BaseModel):
 class MemoryManager:
     """Manager class for handling long-term memory operations."""
 
-    def __init__(self):
-        self.vector_store = get_vector_store()
+    def __init__(self, async_mode: bool = False):
+        self.vector_store = get_async_vector_store() if async_mode else get_vector_store()
         self.logger = logging.getLogger(__name__)
         settings = get_settings()
         self.llm = ChatGroq(
@@ -140,6 +141,6 @@ class MemoryManager:
             return 0
 
 
-def get_memory_manager() -> MemoryManager:
+def get_memory_manager(async_mode: bool = False) -> MemoryManager:
     """Get a MemoryManager instance."""
-    return MemoryManager()
+    return MemoryManager(async_mode=async_mode)
