@@ -222,6 +222,80 @@ class LearningStatsManager:
             "uhm",  # Interjections
         }
 
+    def _normalize_word(self, word: str) -> str:
+        """Convert word to its base form (singular, present tense)."""
+        word_lower = word.lower().strip()
+
+        # Simple pluralization rules - convert to singular
+        if word_lower.endswith("ies") and len(word_lower) > 4:
+            # stories -> story, cities -> city
+            return word_lower[:-3] + "y"
+        elif word_lower.endswith("es") and len(word_lower) > 3:
+            # boxes -> box, wishes -> wish, but keep "yes"
+            if word_lower.endswith(("shes", "ches", "xes", "zes")):
+                return word_lower[:-2]
+            elif word_lower not in ("yes", "goes", "does"):
+                return word_lower[:-1]
+        elif word_lower.endswith("s") and len(word_lower) > 3:
+            # words -> word, cats -> cat, but keep "this", "yes", etc.
+            if word_lower not in (
+                "this",
+                "yes",
+                "his",
+                "its",
+                "was",
+                "has",
+                "bus",
+                "gas",
+                "glass",
+                "class",
+                "pass",
+                "less",
+                "business",
+                "process",
+                "success",
+                "express",
+                "address",
+                "access",
+                "congress",
+                "progress",
+                "stress",
+            ):
+                return word_lower[:-1]
+
+        # Simple verb forms - convert to base form
+        if word_lower.endswith("ing") and len(word_lower) > 5:
+            # learning -> learn, wishing -> wish
+            base = word_lower[:-3]
+            # Handle double consonants (running -> run)
+            if len(base) > 2 and base[-1] == base[-2] and base[-1] not in "aeiou":
+                return base[:-1]
+            return base
+        elif word_lower.endswith("ed") and len(word_lower) > 4:
+            # learned -> learn, wished -> wish
+            return word_lower[:-2]
+
+        return word_lower
+
+    def _are_similar_words(self, word1: str, word2: str) -> bool:
+        """Check if two words are similar forms of the same base word."""
+        norm1 = self._normalize_word(word1)
+        norm2 = self._normalize_word(word2)
+        return norm1 == norm2
+
+    def _deduplicate_vocabulary(self, vocab_list: List[str]) -> List[str]:
+        """Remove duplicate words, keeping only the base/singular form."""
+        seen_normalized = set()
+        deduplicated = []
+
+        for word in vocab_list:
+            normalized = self._normalize_word(word)
+            if normalized not in seen_normalized:
+                seen_normalized.add(normalized)
+                deduplicated.append(normalized)  # Store the normalized form
+
+        return deduplicated
+
     def _is_valid_english_word(self, word: str) -> bool:
         """Check if word is a valid English vocabulary word to track."""
         word_lower = word.lower()
@@ -258,6 +332,9 @@ class LearningStatsManager:
             "where",
             "why",
             "how",
+            "what",
+            "who",
+            "which",
             "this",
             "that",
             "these",
@@ -288,6 +365,9 @@ class LearningStatsManager:
             "best",
             "nice",
             "great",
+            "said",
+            "thank",
+            "thanks",
         }
 
         if word_lower in stop_words:
@@ -435,14 +515,21 @@ class LearningStatsManager:
             # Get existing vocabulary
             learned_vocab = await self.get_user_learned_vocabulary(user_id)
 
+            # Normalize existing vocabulary to prevent duplicates
+            normalized_existing = [self._normalize_word(word) for word in learned_vocab]
+
             # Find truly new vocabulary (English words only)
             new_vocab = []
             for word in vocab_analysis.new_words:
-                if word.lower() not in [v.lower() for v in learned_vocab]:
-                    new_vocab.append(word)
+                normalized_word = self._normalize_word(word)
+                # Check if this normalized word is already in the user's vocabulary
+                if normalized_word not in normalized_existing:
+                    new_vocab.append(normalized_word)
+                    normalized_existing.append(normalized_word)  # Prevent duplicates within this session
 
             # Update database with new vocabulary only
-            await self._update_database_stats(user_id, new_vocab)
+            if new_vocab:
+                await self._update_database_stats(user_id, new_vocab)
 
             stats = {
                 "vocabulary_analysis": {
@@ -497,6 +584,59 @@ class LearningStatsManager:
 
         finally:
             await conn.close()
+
+    async def cleanup_user_vocabulary(self, user_id: str) -> Dict:
+        """Clean up user's vocabulary by removing invalid words and duplicates."""
+        try:
+            # Get current vocabulary
+            current_vocab = await self.get_user_learned_vocabulary(user_id)
+
+            # Filter out invalid words and normalize to singular forms
+            valid_vocab = []
+            removed_words = []
+
+            for word in current_vocab:
+                if self._is_valid_english_word(word):
+                    normalized = self._normalize_word(word)
+                    valid_vocab.append(normalized)
+                else:
+                    removed_words.append(word)
+
+            # Remove duplicates (keeping only singular forms)
+            deduplicated_vocab = self._deduplicate_vocabulary(valid_vocab)
+
+            # Update database with cleaned vocabulary
+            database_url = get_database_url()
+            conn = await asyncpg.connect(database_url)
+
+            try:
+                await conn.execute(
+                    """UPDATE learning_stats
+                       SET vocab_learned = $1, last_updated = now()
+                       WHERE user_id = $2""",
+                    deduplicated_vocab,
+                    uuid.UUID(user_id),
+                )
+            finally:
+                await conn.close()
+
+            duplicates_removed = len(valid_vocab) - len(deduplicated_vocab)
+
+            self.logger.info(
+                f"Cleaned vocabulary for user {user_id}: kept {len(deduplicated_vocab)}, removed {len(removed_words)} invalid, {duplicates_removed} duplicates"
+            )
+
+            return {
+                "original_count": len(current_vocab),
+                "cleaned_count": len(deduplicated_vocab),
+                "removed_words": removed_words,
+                "duplicates_removed": duplicates_removed,
+                "final_vocabulary": deduplicated_vocab,
+            }
+
+        except Exception as e:
+            self.logger.error(f"Failed to cleanup vocabulary for user {user_id}: {e}")
+            return {"error": str(e)}
 
     async def get_learning_summary(self, user_id: str) -> Dict:
         """Get a summary of user's learning progress (vocabulary only)."""
