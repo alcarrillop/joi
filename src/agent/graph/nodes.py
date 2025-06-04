@@ -293,7 +293,7 @@ async def learning_stats_update_node(state: AICompanionState):
         return {"learning_stats_error": str(e)}
 
 
-def router(state: AICompanionState) -> AICompanionState:
+async def router(state: AICompanionState) -> AICompanionState:
     """Route messages based on conversation context and recent interactions."""
     workflow_logger.info("Router node: Analyzing conversation flow")
 
@@ -314,8 +314,7 @@ def router(state: AICompanionState) -> AICompanionState:
 
     # Analyze conversation flow
     router_prompt = ROUTER_PROMPT.format(messages=messages_context)
-    chain = router_llm
-    response = await chain.ainvoke({"messages": state["messages"][-settings.ROUTER_MESSAGES_TO_ANALYZE :]})
+    response = await router_llm.ainvoke([HumanMessage(content=router_prompt)])
 
     # Extract decision from response
     response_text = response.content.lower()

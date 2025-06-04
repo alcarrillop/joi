@@ -1,11 +1,12 @@
 import base64
 import logging
 import os
-from typing import Optional, Union
+from typing import Union
+
+from langchain_groq import ChatGroq
 
 from agent.core.exceptions import ImageToTextError
-from agent.settings import settings
-from groq import Groq
+from agent.settings import get_settings
 
 
 class ImageToText:
@@ -16,7 +17,12 @@ class ImageToText:
     def __init__(self):
         """Initialize the ImageToText class and validate environment variables."""
         self._validate_env_vars()
-        self._client: Optional[Groq] = None
+        settings = get_settings()
+        self.groq_client = ChatGroq(
+            model=settings.ITT_MODEL_NAME,
+            api_key=settings.GROQ_API_KEY,
+            temperature=0.3,
+        )
         self.logger = logging.getLogger(__name__)
 
     def _validate_env_vars(self) -> None:
@@ -24,13 +30,6 @@ class ImageToText:
         missing_vars = [var for var in self.REQUIRED_ENV_VARS if not os.getenv(var)]
         if missing_vars:
             raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
-
-    @property
-    def client(self) -> Groq:
-        """Get or create Groq client instance using singleton pattern."""
-        if self._client is None:
-            self._client = Groq(api_key=settings.GROQ_API_KEY)
-        return self._client
 
     async def analyze_image(self, image_data: Union[str, bytes], prompt: str = "") -> str:
         """Analyze an image using Groq's vision capabilities.
@@ -81,7 +80,8 @@ class ImageToText:
             ]
 
             # Make the API call
-            response = self.client.chat.completions.create(
+            settings = get_settings()
+            response = self.groq_client.chat.completions.create(
                 model=settings.ITT_MODEL_NAME,
                 messages=messages,
                 max_tokens=1000,

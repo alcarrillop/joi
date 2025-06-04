@@ -3,13 +3,15 @@ import logging
 import os
 from typing import Optional
 
-from agent.core.exceptions import TextToImageError
-from agent.core.prompts import IMAGE_ENHANCEMENT_PROMPT, IMAGE_SCENARIO_PROMPT
-from agent.settings import settings
 from langchain.prompts import PromptTemplate
 from langchain_groq import ChatGroq
+from openai import OpenAI
 from pydantic import BaseModel, Field
 from together import Together
+
+from agent.core.exceptions import TextToImageError
+from agent.core.prompts import IMAGE_ENHANCEMENT_PROMPT, IMAGE_SCENARIO_PROMPT
+from agent.settings import get_settings
 
 
 class ScenarioPrompt(BaseModel):
@@ -38,6 +40,13 @@ class TextToImage:
         self._validate_env_vars()
         self._together_client: Optional[Together] = None
         self.logger = logging.getLogger(__name__)
+        settings = get_settings()
+        self.openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        self.groq_client = ChatGroq(
+            model=settings.SMALL_TEXT_MODEL_NAME,
+            api_key=settings.GROQ_API_KEY,
+            temperature=0.7,
+        )
 
     def _validate_env_vars(self) -> None:
         """Validate that all required environment variables are set."""
@@ -49,6 +58,7 @@ class TextToImage:
     def together_client(self) -> Together:
         """Get or create Together client instance using singleton pattern."""
         if self._together_client is None:
+            settings = get_settings()
             self._together_client = Together(api_key=settings.TOGETHER_API_KEY)
         return self._together_client
 
@@ -60,6 +70,7 @@ class TextToImage:
         try:
             self.logger.info(f"Generating image for prompt: '{prompt}'")
 
+            settings = get_settings()
             response = self.together_client.images.generate(
                 prompt=prompt,
                 model=settings.TTI_MODEL_NAME,
@@ -90,6 +101,7 @@ class TextToImage:
 
             self.logger.info("Creating scenario from chat history")
 
+            settings = get_settings()
             llm = ChatGroq(
                 model=settings.TEXT_MODEL_NAME,
                 api_key=settings.GROQ_API_KEY,
@@ -120,6 +132,7 @@ class TextToImage:
         try:
             self.logger.info(f"Enhancing prompt: '{prompt}'")
 
+            settings = get_settings()
             llm = ChatGroq(
                 model=settings.TEXT_MODEL_NAME,
                 api_key=settings.GROQ_API_KEY,

@@ -1,9 +1,10 @@
 import os
 from typing import Optional
 
-from agent.core.exceptions import TextToSpeechError
-from agent.settings import settings
 from elevenlabs import ElevenLabs, Voice, VoiceSettings
+
+from agent.core.exceptions import TextToSpeechError
+from agent.settings import get_settings
 
 
 class TextToSpeech:
@@ -15,6 +16,9 @@ class TextToSpeech:
     def __init__(self):
         """Initialize the TextToSpeech class and validate environment variables."""
         self._validate_env_vars()
+        settings = get_settings()
+        self.voice_id = settings.ELEVENLABS_VOICE_ID
+        self.model_id = settings.TTS_MODEL_NAME
         self._client: Optional[ElevenLabs] = None
 
     def _validate_env_vars(self) -> None:
@@ -27,6 +31,7 @@ class TextToSpeech:
     def client(self) -> ElevenLabs:
         """Get or create ElevenLabs client instance using singleton pattern."""
         if self._client is None:
+            settings = get_settings()
             self._client = ElevenLabs(api_key=settings.ELEVENLABS_API_KEY)
         return self._client
 
@@ -53,10 +58,10 @@ class TextToSpeech:
             audio_generator = self.client.generate(
                 text=text,
                 voice=Voice(
-                    voice_id=settings.ELEVENLABS_VOICE_ID,
+                    voice_id=self.voice_id,
                     settings=VoiceSettings(stability=0.5, similarity_boost=0.5),
                 ),
-                model=settings.TTS_MODEL_NAME,
+                model=self.model_id,
             )
 
             # Convert generator to bytes
