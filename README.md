@@ -58,6 +58,7 @@
    ```bash
    cp .env.example .env
    # Edit .env with your API keys and database URLs
+   # Never commit your filled .env file to version control
    ```
 
 4. **Initialize database**
@@ -121,14 +122,14 @@ docs/                       # Detailed system documentation
 
 ### Current Production State ✅
 
-- **Database**: 27 tables, 6 views, proper foreign key constraints
-- **Users**: 3 active users with real conversation data
-- **Messages**: 54+ messages processed and stored
-- **Memory**: 21 personalized memories extracted
+- **Database**: PostgreSQL with async access via asyncpg
+- **Users**: Example data with a handful of test users
+- **Messages**: Persisted conversations in the database
+- **Memory**: Long term storage using Qdrant vector store
 - **Curriculum**: CEFR-aligned competencies (A1-C2 levels)
-- **Assessment**: Real-time evaluation with 14 skill metrics
-- **Performance**: All endpoints responding <5 seconds
-- **Test Coverage**: 100% system validation (14/14 components)
+- **Assessment**: Real-time evaluation with grammar and vocabulary metrics
+- **Performance**: Target response time under 10 seconds
+- **Test Coverage**: Work in progress
 
 ### System Features
 
@@ -232,10 +233,7 @@ curl http://localhost:8000/debug/health
 
 ### Quick System Validation
 ```bash
-# Test all 14 components
-python test/comprehensive_system_test.py
-
-# Expected output: 100% success rate (14/14 components)
+pytest -q
 ```
 
 ### Component Tests
@@ -281,14 +279,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
     <em>Your AI-powered English learning assistant is just a WhatsApp message away!</em>
 </p>
 
-## 🚀 **PRODUCTION READY** - Deploy Now!
+## 🚀 Deployment
 
-### ✅ System Status
-- **Memory System**: 100% operational with Qdrant vector store
-- **Database**: Simplified to 8 essential tables (64% reduction)
+### System Status
+- **Memory System**: Uses Qdrant vector store
+- **Database**: 8 essential tables
 - **Learning Analytics**: Vocabulary & grammar tracking active
-- **Performance**: ~9 seconds per message processing
-- **Architecture**: LangGraph-aligned, memory-first approach
+- **Performance**: Averages under 10 seconds per message
+- **Architecture**: LangGraph workflow with persistent memory
 
 ## 🎯 Quick Deploy to Railway
 
@@ -402,6 +400,7 @@ docker compose up --build
 - ✅ Non-root Docker user
 - ✅ Input validation and error handling
 - ✅ Structured logging
+- ✅ Secrets managed via environment variables
 
 ## 📖 Documentation
 

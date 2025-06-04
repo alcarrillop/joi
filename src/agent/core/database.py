@@ -43,9 +43,9 @@ async def execute_sql_script(script_path: str):
     conn = await asyncpg.connect(database_url)
     try:
         await conn.execute(sql_content)
-        print(f"✅ SQL script executed successfully: {script_path}")
+        logger.info("SQL script executed successfully: %s", script_path)
     except Exception as e:
-        print(f"❌ Error executing SQL script {script_path}: {e}")
+        logger.error("Error executing SQL script %s: %s", script_path, e)
         raise
     finally:
         await conn.close()
@@ -88,7 +88,12 @@ async def get_or_create_user(phone_number: str, name: str = None) -> str:
             "INSERT INTO users (phone_number, name) VALUES ($1, $2) RETURNING id", phone_number, name
         )
 
-        print(f"✅ Created new user: {phone_number} with ID: {user_id}" + (f" and name: {name}" if name else ""))
+        logger.info(
+            "Created new user %s with ID %s%s",
+            phone_number,
+            user_id,
+            f" and name: {name}" if name else "",
+        )
         return str(user_id)
 
     finally:
@@ -102,9 +107,11 @@ async def update_user_name(user_id: str, name: str):
 
     try:
         await conn.execute(
-            "UPDATE users SET name = $1 WHERE id = $2 AND (name IS NULL OR name = '')", name, uuid.UUID(user_id)
+            "UPDATE users SET name = $1 WHERE id = $2 AND (name IS NULL OR name = '')",
+            name,
+            uuid.UUID(user_id),
         )
-        print(f"✅ Updated name for user {user_id}: {name}")
+        logger.info("Updated name for user %s: %s", user_id, name)
 
     finally:
         await conn.close()
@@ -125,9 +132,12 @@ async def get_or_create_session(user_id: str) -> str:
             return str(session["id"])
 
         # Create new session
-        session_id = await conn.fetchval("INSERT INTO sessions (user_id) VALUES ($1) RETURNING id", uuid.UUID(user_id))
+        session_id = await conn.fetchval(
+            "INSERT INTO sessions (user_id) VALUES ($1) RETURNING id",
+            uuid.UUID(user_id),
+        )
 
-        print(f"✅ Created new session: {session_id} for user: {user_id}")
+        logger.info("Created new session %s for user %s", session_id, user_id)
         return str(session_id)
 
     finally:
@@ -146,7 +156,7 @@ async def log_message(session_id: str, sender: str, message: str):
             sender,
             message,
         )
-        print(f"✅ Logged {sender} message for session: {session_id}")
+        logger.debug("Logged %s message for session %s", sender, session_id)
 
     finally:
         await conn.close()
@@ -195,10 +205,10 @@ async def test_checkpointer_connection():
     """Test that the checkpointer connection and setup works correctly."""
     try:
         await get_checkpointer()
-        print("✅ PostgreSQL checkpointer connection and setup successful!")
+        logger.info("PostgreSQL checkpointer connection and setup successful")
         return True
     except Exception as e:
-        print(f"❌ PostgreSQL checkpointer connection failed: {e}")
+        logger.error("PostgreSQL checkpointer connection failed: %s", e)
         return False
 
 

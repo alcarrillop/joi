@@ -12,11 +12,10 @@ from agent.graph.nodes import (
     conversation_node,
     image_node,
     learning_stats_update_node,
-    memory_extraction_node,
-    memory_injection_node,
     router_node,
     summarize_conversation_node,
 )
+from agent.graph.memory_nodes import memory_extraction_node, memory_injection_node
 from agent.graph.state import AICompanionState
 
 

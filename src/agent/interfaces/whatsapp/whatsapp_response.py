@@ -2,6 +2,7 @@ import logging
 import os
 from io import BytesIO
 from typing import Dict
+from time import perf_counter
 
 import httpx
 from fastapi import APIRouter, Request, Response
@@ -30,6 +31,19 @@ whatsapp_router = APIRouter()
 # WhatsApp API credentials
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
 WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
+WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN")
+
+# Validate required WhatsApp configuration
+def _validate_env() -> None:
+    missing = [
+        var
+        for var in ["WHATSAPP_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_VERIFY_TOKEN"]
+        if not os.getenv(var)
+    ]
+    if missing:
+        raise RuntimeError(f"Missing WhatsApp environment variables: {', '.join(missing)}")
+
+_validate_env()
 
 # Test environment detection
 IS_TEST_ENV = os.getenv("TESTING") == "true" or not WHATSAPP_TOKEN
@@ -37,7 +51,16 @@ IS_TEST_ENV = os.getenv("TESTING") == "true" or not WHATSAPP_TOKEN
 
 @whatsapp_router.api_route("/whatsapp_response", methods=["GET", "POST"])
 async def whatsapp_handler(request: Request) -> Response:
-    """Handles incoming messages and status updates from the WhatsApp Cloud API."""
+    """Handle webhook events from WhatsApp Cloud API.
+
+    **Example payload** (truncated):
+    ```json
+    {
+      "entry": [{"changes": [{"value": {"messages": [{"from": "123", "text": {"body": "hi"}}]}}]}]
+    }
+    ```
+    """
+    start = perf_counter()
 
     if request.method == "GET":
         params = request.query_params
@@ -128,16 +151,23 @@ async def whatsapp_handler(request: Request) -> Response:
             if not success and not IS_TEST_ENV:
                 return Response(content="Failed to send message", status_code=500)
 
+            duration = perf_counter() - start
+            logger.info("Processed message from %s in %.2f seconds", from_number, duration)
             return Response(content="Message processed", status_code=200)
 
         elif "statuses" in change_value:
+            duration = perf_counter() - start
+            logger.info("Status update processed in %.2f seconds", duration)
             return Response(content="Status update received", status_code=200)
 
         else:
+            duration = perf_counter() - start
+            logger.warning("Unknown event type processed in %.2f seconds", duration)
             return Response(content="Unknown event type", status_code=400)
 
     except Exception as e:
-        logger.error(f"Error processing message: {e}", exc_info=True)
+        duration = perf_counter() - start
+        logger.error("Error processing message after %.2f seconds: %s", duration, e, exc_info=True)
         return Response(content="Internal server error", status_code=500)
 
 
@@ -227,17 +257,22 @@ async def send_response(
             "text": {"body": response_text},
         }
 
-    print(headers)
-    print(json_data)
+    logger.debug(headers)
+    logger.debug(json_data)
 
     async with httpx.AsyncClient() as client:
-        response = await client.post(
-            f"https://graph.facebook.com/v21.0/{WHATSAPP_PHONE_NUMBER_ID}/messages",
-            headers=headers,
-            json=json_data,
-        )
+        try:
+            response = await client.post(
+                f"https://graph.facebook.com/v21.0/{WHATSAPP_PHONE_NUMBER_ID}/messages",
+                headers=headers,
+                json=json_data,
+            )
+            response.raise_for_status()
+        except httpx.HTTPError as e:
+            logger.error("Failed to send message to WhatsApp: %s", e)
+            return False
 
-    return response.status_code == 200
+    return True
 
 
 async def upload_media(media_content: BytesIO, mime_type: str) -> str:
