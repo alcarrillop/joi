@@ -24,8 +24,8 @@ src_dir = os.path.normpath(src_dir)
 if os.path.exists(src_dir):
     sys.path.insert(0, src_dir)
 
-import asyncpg
-from agent.core.database import get_database_url
+import asyncpg  # noqa: E402
+from agent.core.database import get_database_url  # noqa: E402
 
 
 async def check_and_update_schema():

@@ -538,12 +538,14 @@ async def summarize_conversation(state: AICompanionState) -> AICompanionState:
     # Create summary message
     summary_message = AIMessage(content=f"[Conversation Summary: {response.content}]")
 
-    # Update state: replace old messages with summary + recent messages
+    # Determine which messages need to be removed before updating the state
+    delete_messages = [RemoveMessage(id=m.id) for m in messages_to_summarize]
+
+    # Replace old messages with the summary and recent messages
     new_messages = [summary_message] + recent_messages
     state["messages"] = new_messages
 
-    # Also remove the old messages from checkpointer if available
-    delete_messages = [RemoveMessage(id=m.id) for m in state["messages"][: -settings.TOTAL_MESSAGES_AFTER_SUMMARY]]
+    # Append removal markers so the checkpointer can prune old messages
     if delete_messages:
         state["messages"].extend(delete_messages)
 
