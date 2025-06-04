@@ -406,6 +406,24 @@ class LearningStatsManager:
         finally:
             await conn.close()
 
+    async def get_vocabulary_word_count(self, user_id: str) -> int:
+        """Return the total number of words learned by the user."""
+        database_url = get_database_url()
+        conn = await asyncpg.connect(database_url)
+
+        try:
+            result = await conn.fetchrow(
+                "SELECT vocab_learned FROM learning_stats WHERE user_id = $1",
+                uuid.UUID(user_id),
+            )
+
+            if result and result["vocab_learned"]:
+                return len(result["vocab_learned"])
+            return 0
+
+        finally:
+            await conn.close()
+
     async def update_learning_stats(self, user_id: str, session_id: str, message_text: str) -> Dict:
         """Update learning statistics for a user based on their message."""
         self.logger.info(f"Updating learning stats for user {user_id}")
