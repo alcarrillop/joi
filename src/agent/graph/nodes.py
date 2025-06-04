@@ -98,6 +98,11 @@ async def conversation_node(state: AICompanionState, config: RunnableConfig):
     if last_human_message:
         message_lower = last_human_message.content.lower()
 
+        # Check specifically for "how many" vocabulary questions
+        is_vocab_count_question = "how many" in message_lower and any(
+            keyword in message_lower for keyword in vocab_keywords
+        )
+
         # Check for level-related questions
         is_level_question = any(keyword in message_lower for keyword in level_keywords) and any(
             keyword in message_lower for keyword in english_keywords
@@ -107,6 +112,16 @@ async def conversation_node(state: AICompanionState, config: RunnableConfig):
         is_vocab_question = any(keyword in message_lower for keyword in vocab_keywords) and (
             "learned" in message_lower or "learning" in message_lower or "many" in message_lower
         )
+
+        if is_vocab_count_question:
+            try:
+                learning_manager = get_learning_stats_manager()
+                count = await learning_manager.get_vocabulary_word_count(user_id)
+                workflow_logger.info(f"[CONVERSATION] Provided vocab count for user {user_id}: {count}")
+                return {"messages": AIMessage(content=f"You've learned {count} English words so far.")}
+            except Exception as e:
+                workflow_logger.warning(f"[CONVERSATION] Failed to get vocab count for user {user_id}: {e}")
+                # Fall through to other checks
 
         if is_level_question or is_vocab_question:
             # User is asking about their English level or vocabulary progress
