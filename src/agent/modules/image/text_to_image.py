@@ -5,7 +5,6 @@ from typing import Optional
 
 from langchain.prompts import PromptTemplate
 from langchain_groq import ChatGroq
-from openai import OpenAI
 from pydantic import BaseModel, Field
 from together import Together
 
@@ -41,7 +40,6 @@ class TextToImage:
         self._together_client: Optional[Together] = None
         self.logger = logging.getLogger(__name__)
         settings = get_settings()
-        self.openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
         self.groq_client = ChatGroq(
             model=settings.SMALL_TEXT_MODEL_NAME,
             api_key=settings.GROQ_API_KEY,

@@ -51,6 +51,10 @@
    ```
 
 3. **Setup environment variables**
+   
+   The repository includes a `.env.example` file with placeholders for all
+   configuration options defined in `src/agent/settings.py`. Use it as the
+   starting point for your own environment file.
    ```bash
    cp .env.example .env
    # Edit .env with your API keys and database URLs
@@ -138,24 +142,18 @@ docs/                       # Detailed system documentation
 
 ## 🔧 Configuration
 
+The repository includes a `.env.example` file with a complete list of
+configuration variables. Copy it and update the values to match your setup.
+
 ### Required Environment Variables
 
 ```bash
-# AI Services
-GROQ_API_KEY=your_groq_api_key
-ELEVENLABS_API_KEY=your_elevenlabs_key
-ELEVENLABS_VOICE_ID=your_voice_id
-TOGETHER_API_KEY=your_together_api_key
-
-# Databases
-DATABASE_URL=postgresql://user:pass@host:port/db
-QDRANT_URL=https://your-cluster.qdrant.io:6333
-QDRANT_API_KEY=your_qdrant_api_key
-
-# WhatsApp
-WHATSAPP_TOKEN=your_whatsapp_token
-WHATSAPP_PHONE_NUMBER_ID=your_phone_number_id
-WHATSAPP_VERIFY_TOKEN=your_verify_token
+DATABASE_URL=postgresql://...          # Supabase
+QDRANT_URL=https://...                # Qdrant Cloud  
+QDRANT_API_KEY=...                    # Qdrant API key
+WHATSAPP_TOKEN=...                    # WhatsApp Business API
+WHATSAPP_PHONE_NUMBER_ID=...          # WhatsApp Phone Number
+WHATSAPP_WEBHOOK_VERIFY_TOKEN=...     # Webhook verification
 ```
 
 ---
@@ -306,7 +304,6 @@ QDRANT_API_KEY=...                    # Qdrant API key
 WHATSAPP_TOKEN=...                    # WhatsApp Business API
 WHATSAPP_PHONE_NUMBER_ID=...          # WhatsApp Phone Number
 WHATSAPP_WEBHOOK_VERIFY_TOKEN=...     # Webhook verification
-OPENAI_API_KEY=...                    # OpenAI API
 ```
 
 ## 🏗️ Architecture
@@ -372,7 +369,7 @@ docker compose up --build
 ## 🔧 Tech Stack
 
 - **Framework**: FastAPI + LangGraph  
-- **AI**: OpenAI GPT models
+- **AI**: Groq LLM models
 - **Memory**: Qdrant vector database
 - **Database**: PostgreSQL (Supabase)
 - **Deployment**: Railway + Docker

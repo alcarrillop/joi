@@ -6,7 +6,6 @@
 - Supabase PostgreSQL database (already configured)
 - Qdrant Cloud vector database (already configured)
 - WhatsApp Business API access
-- OpenAI API key
 
 ### 1. Environment Variables
 
@@ -24,9 +23,6 @@ QDRANT_API_KEY=your-api-key
 WHATSAPP_TOKEN=your-access-token
 WHATSAPP_PHONE_NUMBER_ID=your-phone-number-id
 WHATSAPP_WEBHOOK_VERIFY_TOKEN=your-webhook-verify-token
-
-# OpenAI
-OPENAI_API_KEY=your-openai-api-key
 
 # Environment
 TESTING=false
