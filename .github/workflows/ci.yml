@@ -74,10 +74,31 @@ jobs:
       run: |
         uv run pytest tests/ -v --cov=src/agent --cov-report=xml --cov-report=term-missing
       env:
-        # Mock environment variables for testing
+        # Core test environment
         ENVIRONMENT: testing
-        GROQ_API_KEY: test_key
+        TESTING: true
+        
+        # API Keys (test values)
+        GROQ_API_KEY: test_groq_key
+        ELEVENLABS_API_KEY: test_elevenlabs_key
+        ELEVENLABS_VOICE_ID: test_voice_id
+        TOGETHER_API_KEY: test_together_key
+        
+        # WhatsApp Configuration (test values)
+        WHATSAPP_TOKEN: test_whatsapp_token
+        WHATSAPP_PHONE_NUMBER_ID: 123456789
+        WHATSAPP_VERIFY_TOKEN: test_verify_token
+        
+        # Database Configuration (test values)
         DATABASE_URL: "sqlite:///:memory:"
+        SUPABASE_URL: https://test.supabase.co
+        SUPABASE_KEY: test_supabase_key
+        
+        # Vector Database Configuration (test values)
+        QDRANT_URL: memory
+        QDRANT_API_KEY: test_qdrant_key
+        QDRANT_PORT: 6333
+        QDRANT_HOST: localhost
 
   docker-build:
     name: Docker Build Test
@@ -106,6 +127,7 @@ jobs:
         # Run a quick test to ensure the image starts correctly
         docker run --rm -d --name test-container -p 8080:8000 \
           -e ENVIRONMENT=testing \
+          -e TESTING=true \
           -e GROQ_API_KEY=test_key \
           -e ELEVENLABS_API_KEY=test_key \
           -e ELEVENLABS_VOICE_ID=test_voice \
