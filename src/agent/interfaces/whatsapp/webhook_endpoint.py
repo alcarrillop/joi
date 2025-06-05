@@ -42,11 +42,19 @@ async def test_database_connection():
         # Log the URL format (without credentials)
         url_info = database_url.split("@")[1] if "@" in database_url else "URL format issue"
 
+        # Check for potential encoding issues
+        has_special_chars = any(char in database_url for char in ["@", "#", "$", "%", "&", "+", "/", "?"])
+        protocol = database_url.split("://")[0] if "://" in database_url else "unknown"
+
         # Test basic connection
         conn = await asyncpg.connect(database_url)
 
         # Test a simple query
         result = await conn.fetchval("SELECT 1")
+
+        # Test table creation capability
+        await conn.execute("SELECT NOW()")
+
         await conn.close()
 
         return {
@@ -54,14 +62,19 @@ async def test_database_connection():
             "message": "Database connection successful",
             "host_info": url_info,
             "test_query": result,
+            "protocol": protocol,
+            "has_special_chars": has_special_chars,
         }
 
     except Exception as e:
+        import traceback
+
         return {
             "status": "error",
             "message": f"Database connection failed: {str(e)}",
             "error_type": type(e).__name__,
             "url_format": url_info if "url_info" in locals() else "Could not parse URL",
+            "full_error": traceback.format_exc()[-500:],  # Last 500 chars of traceback
         }
 
 
