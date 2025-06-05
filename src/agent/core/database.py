@@ -69,7 +69,16 @@ async def ensure_tables_exist():
 async def get_or_create_user(phone_number: str, name: str = None) -> str:
     """Get existing user or create new user by phone number."""
     database_url = get_database_url()
-    conn = await asyncpg.connect(database_url)
+
+    # Add connection parameters for better Supabase compatibility
+    conn = await asyncpg.connect(
+        database_url,
+        server_settings={
+            "application_name": "joi-english-agent",
+            "jit": "off",
+        },
+        command_timeout=30,
+    )
 
     try:
         # Try to find existing user

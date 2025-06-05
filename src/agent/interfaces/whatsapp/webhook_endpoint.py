@@ -46,8 +46,15 @@ async def test_database_connection():
         has_special_chars = any(char in database_url for char in ["@", "#", "$", "%", "&", "+", "/", "?"])
         protocol = database_url.split("://")[0] if "://" in database_url else "unknown"
 
-        # Test basic connection
-        conn = await asyncpg.connect(database_url)
+        # Test basic connection with Supabase-compatible parameters
+        conn = await asyncpg.connect(
+            database_url,
+            server_settings={
+                "application_name": "joi-debug",
+                "jit": "off",
+            },
+            command_timeout=30,
+        )
 
         # Test a simple query
         result = await conn.fetchval("SELECT 1")
