@@ -31,7 +31,7 @@ FROM python:3.12-slim-bookworm AS production
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONPATH=/app/src
-ENV TRANSFORMERS_CACHE=/app/data/cache
+ENV HF_HOME=/app/data/cache
 
 # Install only runtime dependencies
 RUN apt-get update && apt-get install -y \
