@@ -28,10 +28,21 @@ def get_database_url() -> str:
     return database_url
 
 
+async def get_db_connection():
+    """Get a database connection with Supabase-compatible parameters."""
+    database_url = get_database_url()
+    return await asyncpg.connect(
+        database_url,
+        server_settings={
+            "application_name": "joi-english-agent",
+            "jit": "off",
+        },
+        command_timeout=30,
+    )
+
+
 async def execute_sql_script(script_path: str):
     """Execute a SQL script file against the database."""
-    database_url = get_database_url()
-
     # Read the SQL script
     script_file = Path(script_path)
     if not script_file.exists():
@@ -40,7 +51,7 @@ async def execute_sql_script(script_path: str):
     sql_content = script_file.read_text(encoding="utf-8")
 
     # Connect and execute
-    conn = await asyncpg.connect(database_url)
+    conn = await get_db_connection()
     try:
         await conn.execute(sql_content)
         logger.info("SQL script executed successfully: %s", script_path)
@@ -68,17 +79,7 @@ async def ensure_tables_exist():
 
 async def get_or_create_user(phone_number: str, name: str = None) -> str:
     """Get existing user or create new user by phone number."""
-    database_url = get_database_url()
-
-    # Add connection parameters for better Supabase compatibility
-    conn = await asyncpg.connect(
-        database_url,
-        server_settings={
-            "application_name": "joi-english-agent",
-            "jit": "off",
-        },
-        command_timeout=30,
-    )
+    conn = await get_db_connection()
 
     try:
         # Try to find existing user
@@ -111,8 +112,7 @@ async def get_or_create_user(phone_number: str, name: str = None) -> str:
 
 async def update_user_name(user_id: str, name: str):
     """Update user name if not already set."""
-    database_url = get_database_url()
-    conn = await asyncpg.connect(database_url)
+    conn = await get_db_connection()
 
     try:
         await conn.execute(
@@ -128,8 +128,7 @@ async def update_user_name(user_id: str, name: str):
 
 async def get_or_create_session(user_id: str) -> str:
     """Get active session or create new session for user."""
-    database_url = get_database_url()
-    conn = await asyncpg.connect(database_url)
+    conn = await get_db_connection()
 
     try:
         # Try to find the most recent session for the user
@@ -155,8 +154,7 @@ async def get_or_create_session(user_id: str) -> str:
 
 async def log_message(session_id: str, sender: str, message: str):
     """Log a message to the messages table."""
-    database_url = get_database_url()
-    conn = await asyncpg.connect(database_url)
+    conn = await get_db_connection()
 
     try:
         await conn.execute(
@@ -173,8 +171,7 @@ async def log_message(session_id: str, sender: str, message: str):
 
 async def get_user_stats(user_id: str) -> Dict:
     """Get user learning statistics (vocabulary only) from the new user_word_stats table."""
-    database_url = get_database_url()
-    conn = await asyncpg.connect(database_url)
+    conn = await get_db_connection()
 
     try:
         # Get vocabulary from the new user_word_stats table
