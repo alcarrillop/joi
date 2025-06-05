@@ -29,6 +29,42 @@ async def simple_health_check():
     }
 
 
+@app.get("/debug/db-test")
+async def test_database_connection():
+    """Test database connectivity for debugging."""
+    import asyncpg
+
+    try:
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            return {"status": "error", "message": "DATABASE_URL not set"}
+
+        # Log the URL format (without credentials)
+        url_info = database_url.split("@")[1] if "@" in database_url else "URL format issue"
+
+        # Test basic connection
+        conn = await asyncpg.connect(database_url)
+
+        # Test a simple query
+        result = await conn.fetchval("SELECT 1")
+        await conn.close()
+
+        return {
+            "status": "success",
+            "message": "Database connection successful",
+            "host_info": url_info,
+            "test_query": result,
+        }
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Database connection failed: {str(e)}",
+            "error_type": type(e).__name__,
+            "url_format": url_info if "url_info" in locals() else "Could not parse URL",
+        }
+
+
 # Only load heavy dependencies after the basic app is set up
 @app.on_event("startup")
 async def load_routers():
