@@ -72,5 +72,8 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=60s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
-# Run the application with correct import path and dynamic port
-CMD ["sh", "-c", "uvicorn src.agent.interfaces.whatsapp.webhook_endpoint:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
+# Make startup script executable and run it
+RUN chmod +x /app/scripts/start.sh
+
+# Run the application using the startup script
+CMD ["/app/scripts/start.sh"]
