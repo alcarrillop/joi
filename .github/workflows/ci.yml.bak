@@ -1,0 +1,218 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  lint:
+    name: Linting and Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install UV
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: "latest"
+    
+    - name: Install dependencies
+      run: |
+        uv sync --dev --frozen
+    
+    - name: Run Ruff linting (with fixes)
+      run: |
+        uv run ruff check src/ tests/ --fix || true
+    
+    - name: Run Ruff formatting
+      run: |
+        uv run ruff format src/ tests/
+    
+    - name: Run MyPy type checking
+      run: |
+        uv run mypy src/agent/ || true
+      continue-on-error: true
+    
+    - name: Run Bandit security scan
+      run: |
+        uv run bandit -r src/ || true
+      continue-on-error: true
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install UV
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: "latest"
+    
+    - name: Install dependencies
+      run: |
+        uv sync --dev --frozen
+    
+    - name: Run unit tests
+      run: |
+        uv run pytest tests/ -v --cov=src/agent --cov-report=xml --cov-report=term-missing
+      env:
+        # Mock environment variables for testing
+        ENVIRONMENT: testing
+        GROQ_API_KEY: test_key
+        DATABASE_URL: "sqlite:///:memory:"
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      if: success()
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: false
+
+  docker-build:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        push: false
+        tags: joi-english-agent:test
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64
+        load: true
+    
+    - name: Test Docker image
+      run: |
+        # Run a quick test to ensure the image starts correctly
+        docker run --rm -d --name test-container -p 8080:8000 \
+          -e ENVIRONMENT=testing \
+          -e GROQ_API_KEY=test_key \
+          -e DATABASE_URL=sqlite:///memory: \
+          -e PORT=8000 \
+          joi-english-agent:test
+        
+        # Wait a bit for the container to start
+        sleep 20
+        
+        # Check if the container is running and capture logs before potential removal
+        if docker ps | grep -q test-container; then
+          echo "✅ Container is running"
+          
+          # Test the health endpoint
+          for i in {1..6}; do
+            if curl -f http://localhost:8080/health; then
+              echo "✅ Health check passed"
+              break
+            else
+              echo "⏳ Waiting for health check... (attempt $i/6)"
+              sleep 10
+            fi
+          done
+          
+          echo "✅ Container started successfully"
+        else
+          echo "❌ Container failed to start or exited early"
+          # Try to get logs even if container was removed
+          docker logs test-container 2>/dev/null || echo "Container logs not available (container may have been auto-removed)"
+          exit 1
+        fi
+        
+        # Stop the container
+        docker stop test-container || true
+
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+      continue-on-error: true
+    
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+      continue-on-error: true
+
+  pre-commit:
+    name: Pre-commit Hooks
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install UV
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: "latest"
+    
+    - name: Install dependencies
+      run: |
+        uv sync --dev --frozen
+    
+    - name: Run pre-commit hooks
+      run: |
+        uv run pre-commit run --all-files
+      continue-on-error: true
+
+  deploy-production:
+    name: Deploy to Railway Production
+    runs-on: ubuntu-latest
+    needs: [lint, test, docker-build, security-scan]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Railway CLI
+      run: |
+        curl -fsSL https://railway.app/install.sh | sh
+        echo "$HOME/.railway/bin" >> $GITHUB_PATH
+    
+    - name: Deploy to Railway Production
+      run: |
+        railway up --service joi-english-agent
+      env:
+        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }} 

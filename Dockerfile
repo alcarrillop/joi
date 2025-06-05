@@ -33,8 +33,10 @@ ENV PYTHONPATH=/app/src
 RUN apt-get update && apt-get install -y \
     curl \
     libpq5 \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+    && apt-get clean \
+    && update-ca-certificates
 
 # Create app user for security (before copying files)
 RUN groupadd -r appuser && useradd -r -g appuser appuser
@@ -57,12 +59,15 @@ COPY --chown=appuser:appuser scripts/ ./scripts/
 ENV VIRTUAL_ENV=/app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
-# Expose port
+# Create data directory for potential file storage
+RUN mkdir -p /app/data
+
+# Expose port (Railway will override with PORT env var)
 EXPOSE 8000
 
-# Health check for Railway (using simple endpoint)
-HEALTHCHECK --interval=30s --timeout=30s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:8000/health || exit 1
+# Health check with longer timeout for Railway
+HEALTHCHECK --interval=30s --timeout=60s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
-# Run the application (fixed port)
-CMD ["uvicorn", "src.agent.interfaces.whatsapp.webhook_endpoint:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+# Run the application with correct import path and dynamic port
+CMD ["sh", "-c", "uvicorn src.agent.interfaces.whatsapp.webhook_endpoint:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]

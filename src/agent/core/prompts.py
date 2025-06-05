@@ -14,12 +14,16 @@ IMPORTANT RULES FOR IMAGE GENERATION:
 4. The request for an image should be the main intent of the user's last message
 
 IMPORTANT RULES FOR AUDIO GENERATION:
-1. ONLY generate audio when there is an EXPLICIT request to hear Joi's voice
+1. Generate audio when the user requests to hear Joi's voice
+2. Generate audio when the user asks for an audio message, voice message, or recording
+3. Generate audio when the user asks Joi to "send audio", "send voice", or "record something"
+4. Generate audio when the user asks "can you send audio about..." or similar phrasing
+5. Look for keywords like: audio, voice, recording, send audio, voice message, hear you, speak
 
 Output MUST be one of:
 1. 'conversation' - for normal text message responses
 2. 'image' - ONLY when user explicitly requests visual content
-3. 'audio' - ONLY when user explicitly requests voice/audio
+3. 'audio' - when user requests audio/voice messages in any form
 """
 
 CONVERSATION_PROMPT = """

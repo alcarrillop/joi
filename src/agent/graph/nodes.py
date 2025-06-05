@@ -55,7 +55,14 @@ async def router_node(state: AICompanionState):
     try:
         chain = get_router_chain()
         settings = get_settings()
-        response = await chain.ainvoke({"messages": state["messages"][-settings.ROUTER_MESSAGES_TO_ANALYZE :]})
+        messages_to_analyze = state["messages"][-settings.ROUTER_MESSAGES_TO_ANALYZE :]
+
+        # Log the messages being analyzed
+        workflow_logger.debug(f"[ROUTER] Analyzing {len(messages_to_analyze)} messages for user {user_id}")
+        for i, msg in enumerate(messages_to_analyze):
+            workflow_logger.debug(f"[ROUTER] Message {i}: {msg.type} - {msg.content[:100]}...")
+
+        response = await chain.ainvoke({"messages": messages_to_analyze})
 
         workflow_logger.info(f"[ROUTER] Selected workflow: {response.response_type} for user {user_id}")
         return {"workflow": response.response_type}
@@ -242,8 +249,6 @@ async def summarize_conversation_node(state: AICompanionState):
     workflow_logger.info(f"[SUMMARY] Created summary for user {user_id}, removing {len(delete_messages)} old messages")
 
     return {"summary": response.content, "messages": delete_messages}
-
-
 
 
 async def learning_stats_update_node(state: AICompanionState):

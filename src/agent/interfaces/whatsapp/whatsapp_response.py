@@ -1,8 +1,9 @@
 import logging
 import os
+import time
 from io import BytesIO
-from typing import Dict
 from time import perf_counter
+from typing import Dict
 
 import httpx
 from fastapi import APIRouter, Request, Response
@@ -25,7 +26,7 @@ speech_to_text = SpeechToText()
 text_to_speech = TextToSpeech()
 image_to_text = ImageToText()
 
-# Router for WhatsApp respo
+# Router for WhatsApp response
 whatsapp_router = APIRouter()
 
 # WhatsApp API credentials
@@ -33,15 +34,39 @@ WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
 WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
 WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN")
 
+# Message deduplication - simple in-memory cache
+# In production, use Redis or database for persistence
+_processed_messages: Dict[str, float] = {}
+DEDUP_CACHE_TTL = 300  # 5 minutes
+
+
+def _is_message_already_processed(message_id: str) -> bool:
+    """Check if message was already processed and clean old entries."""
+    current_time = time.time()
+
+    # Clean old entries
+    expired_keys = [k for k, v in _processed_messages.items() if current_time - v > DEDUP_CACHE_TTL]
+    for key in expired_keys:
+        del _processed_messages[key]
+
+    # Check if already processed
+    if message_id in _processed_messages:
+        logger.info(f"Skipping duplicate message: {message_id}")
+        return True
+
+    # Mark as processed
+    _processed_messages[message_id] = current_time
+    return False
+
+
 # Validate required WhatsApp configuration
 def _validate_env() -> None:
     missing = [
-        var
-        for var in ["WHATSAPP_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_VERIFY_TOKEN"]
-        if not os.getenv(var)
+        var for var in ["WHATSAPP_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_VERIFY_TOKEN"] if not os.getenv(var)
     ]
     if missing:
         raise RuntimeError(f"Missing WhatsApp environment variables: {', '.join(missing)}")
+
 
 _validate_env()
 
@@ -74,6 +99,11 @@ async def whatsapp_handler(request: Request) -> Response:
         if "messages" in change_value:
             message = change_value["messages"][0]
             from_number = message["from"]
+            message_id = message.get("id")
+
+            # Skip if this message was already processed (deduplication)
+            if message_id and _is_message_already_processed(message_id):
+                return Response(content="Duplicate message ignored", status_code=200)
 
             # Extract user name from WhatsApp contacts if available
             user_name = None
