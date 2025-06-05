@@ -15,6 +15,9 @@ RUN apt-get update && apt-get install -y \
 COPY uv.lock pyproject.toml README.md ./
 
 # Install dependencies in a virtual environment
+# First install PyTorch CPU-only to avoid the large CUDA version
+RUN uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu --no-cache
+# Then install other dependencies
 RUN uv sync --frozen --no-cache --no-dev
 
 # Install the package in editable mode
