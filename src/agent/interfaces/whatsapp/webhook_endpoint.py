@@ -32,7 +32,7 @@ async def simple_health_check():
 @app.get("/debug/db-test")
 async def test_database_connection():
     """Test database connectivity for debugging."""
-    import asyncpg
+    import psycopg
 
     try:
         database_url = os.getenv("DATABASE_URL")
@@ -46,29 +46,30 @@ async def test_database_connection():
         has_special_chars = any(char in database_url for char in ["@", "#", "$", "%", "&", "+", "/", "?"])
         protocol = database_url.split("://")[0] if "://" in database_url else "unknown"
 
-        # Test basic connection with Supabase-compatible parameters
-        conn = await asyncpg.connect(
+        # Test basic connection with psycopg3
+        conn = await psycopg.AsyncConnection.connect(
             database_url,
-            server_settings={
-                "application_name": "joi-debug",
-                "jit": "off",
-            },
-            command_timeout=30,
+            autocommit=False,
+            connect_timeout=30,
         )
 
         # Test a simple query
-        result = await conn.fetchval("SELECT 1")
+        async with conn.cursor() as cur:
+            await cur.execute("SELECT 1")
+            result = await cur.fetchone()
+            test_query_result = result[0]
 
-        # Test table creation capability
-        await conn.execute("SELECT NOW()")
+            # Test table creation capability
+            await cur.execute("SELECT NOW()")
+            await cur.fetchone()
 
         await conn.close()
 
         return {
             "status": "success",
-            "message": "Database connection successful",
+            "message": "Database connection successful with psycopg3",
             "host_info": url_info,
-            "test_query": result,
+            "test_query": test_query_result,
             "protocol": protocol,
             "has_special_chars": has_special_chars,
         }
