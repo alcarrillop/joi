@@ -6,7 +6,6 @@ import uuid
 from datetime import datetime
 from typing import Dict, List, Optional
 
-import asyncpg
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel

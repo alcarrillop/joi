@@ -11,7 +11,6 @@ import re
 import uuid
 from typing import Dict, List
 
-import asyncpg
 from langchain_groq import ChatGroq
 from pydantic import BaseModel
 
