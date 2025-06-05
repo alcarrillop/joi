@@ -31,6 +31,7 @@ FROM python:3.12-slim-bookworm AS production
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONPATH=/app/src
+ENV TRANSFORMERS_CACHE=/app/data/cache
 
 # Install only runtime dependencies
 RUN apt-get update && apt-get install -y \
@@ -62,8 +63,8 @@ COPY --chown=appuser:appuser scripts/ ./scripts/
 ENV VIRTUAL_ENV=/app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
-# Create data directory for potential file storage
-RUN mkdir -p /app/data
+# Create data directories for file storage and cache
+RUN mkdir -p /app/data /app/data/cache
 
 # Expose port (Railway will override with PORT env var)
 EXPOSE 8000
