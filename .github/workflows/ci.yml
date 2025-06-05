@@ -78,17 +78,11 @@ jobs:
         ENVIRONMENT: testing
         GROQ_API_KEY: test_key
         DATABASE_URL: "sqlite:///:memory:"
-    
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
-      if: success()
-      with:
-        file: ./coverage.xml
-        fail_ci_if_error: false
 
   docker-build:
     name: Docker Build Test
     runs-on: ubuntu-latest
+    needs: [lint, test]  # Only run after lint and test pass
     
     steps:
     - uses: actions/checkout@v4
@@ -103,10 +97,9 @@ jobs:
         file: ./Dockerfile
         push: false
         tags: joi-english-agent:test
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
         platforms: linux/amd64
         load: true
+        # Remove cache to avoid disk space issues
     
     - name: Test Docker image
       run: |
@@ -114,37 +107,44 @@ jobs:
         docker run --rm -d --name test-container -p 8080:8000 \
           -e ENVIRONMENT=testing \
           -e GROQ_API_KEY=test_key \
+          -e ELEVENLABS_API_KEY=test_key \
+          -e ELEVENLABS_VOICE_ID=test_voice \
+          -e TOGETHER_API_KEY=test_key \
+          -e WHATSAPP_TOKEN=test_token \
+          -e WHATSAPP_PHONE_NUMBER_ID=123456789 \
+          -e WHATSAPP_VERIFY_TOKEN=test_verify \
           -e DATABASE_URL=sqlite:///memory: \
+          -e SUPABASE_URL=https://test.supabase.co \
+          -e SUPABASE_KEY=test_key \
+          -e QDRANT_URL=memory \
+          -e QDRANT_API_KEY=test_key \
           -e PORT=8000 \
           joi-english-agent:test
         
-        # Wait a bit for the container to start
-        sleep 20
+        # Wait for container to start
+        sleep 30
         
-        # Check if the container is running and capture logs before potential removal
+        # Check if container is running
         if docker ps | grep -q test-container; then
           echo "✅ Container is running"
           
-          # Test the health endpoint
-          for i in {1..6}; do
+          # Test health endpoint
+          for i in {1..10}; do
             if curl -f http://localhost:8080/health; then
               echo "✅ Health check passed"
               break
             else
-              echo "⏳ Waiting for health check... (attempt $i/6)"
-              sleep 10
+              echo "⏳ Waiting for health check... (attempt $i/10)"
+              sleep 5
             fi
           done
-          
-          echo "✅ Container started successfully"
         else
-          echo "❌ Container failed to start or exited early"
-          # Try to get logs even if container was removed
-          docker logs test-container 2>/dev/null || echo "Container logs not available (container may have been auto-removed)"
+          echo "❌ Container failed to start"
+          docker logs test-container 2>/dev/null || echo "No logs available"
           exit 1
         fi
         
-        # Stop the container
+        # Cleanup
         docker stop test-container || true
 
   security-scan:
@@ -159,15 +159,7 @@ jobs:
       with:
         scan-type: 'fs'
         scan-ref: '.'
-        format: 'sarif'
-        output: 'trivy-results.sarif'
-      continue-on-error: true
-    
-    - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v3
-      if: always()
-      with:
-        sarif_file: 'trivy-results.sarif'
+        format: 'table'
       continue-on-error: true
 
   pre-commit:
@@ -199,7 +191,7 @@ jobs:
   deploy-production:
     name: Deploy to Railway Production
     runs-on: ubuntu-latest
-    needs: [lint, test, docker-build, security-scan]
+    needs: [lint, test, docker-build, security-scan, pre-commit]  # Wait for ALL jobs to pass
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment: production
     
