@@ -20,10 +20,10 @@ setup: ## Setup the project for development
 
 # Development commands
 run: ## Run the application locally
-	uvicorn src.agent.interfaces.whatsapp.webhook_endpoint:app --host 0.0.0.0 --port 8000 --workers 1
+	uv run uvicorn src.agent.interfaces.whatsapp.webhook_endpoint:app --host 0.0.0.0 --port 8000 --workers 1
 
 run-dev: ## Run the application in development mode with reload
-	uvicorn src.agent.interfaces.whatsapp.webhook_endpoint:app --host 0.0.0.0 --port 8000 --reload
+	uv run uvicorn src.agent.interfaces.whatsapp.webhook_endpoint:app --host 0.0.0.0 --port 8000 --reload
 
 run-script: ## Run using the start script
 	chmod +x scripts/start.sh
@@ -31,35 +31,35 @@ run-script: ## Run using the start script
 
 # Testing
 test: ## Run tests
-	pytest
+	uv run pytest
 
 test-cov: ## Run tests with coverage
-	pytest --cov=src --cov-report=html --cov-report=term
+	uv run pytest --cov=src --cov-report=html --cov-report=term
 
 test-watch: ## Run tests in watch mode
-	pytest -f
+	uv run pytest -f
 
 # Code quality
 lint: ## Run linting
-	ruff check .
+	uv run ruff check .
 
 lint-fix: ## Run linting with auto-fix
-	ruff check . --fix
+	uv run ruff check . --fix
 
 format: ## Format code
-	ruff format .
+	uv run ruff format .
 
 format-check: ## Check if code is formatted
-	ruff format . --check
+	uv run ruff format . --check
 
 check: ## Run all checks (lint + format + tests)
 	@echo "Running all checks..."
-	ruff check .
-	ruff format . --check
-	pytest
+	uv run ruff check .
+	uv run ruff format . --check
+	uv run pytest
 
 pre-commit: ## Run pre-commit hooks
-	pre-commit run --all-files
+	uv run pre-commit run --all-files
 
 # Docker commands
 docker-build: ## Build Docker image
@@ -79,7 +79,7 @@ docker-logs: ## Show Docker logs
 
 # Database commands
 db-init: ## Initialize database
-	python -m scripts.update_database_schema
+	uv run python -m scripts.update_database_schema
 
 # Cleanup
 clean: ## Clean up temporary files
@@ -102,9 +102,9 @@ dev: dev-install pre-commit ## Setup development environment
 quick-check: lint test ## Quick check before commit
 
 ci: ## Run CI-like checks
-	ruff check .
-	ruff format . --check
-	pytest --cov=src
+	uv run ruff check .
+	uv run ruff format . --check
+	uv run pytest --cov=src
 
 # Local development server
 serve: run-dev ## Alias for run-dev

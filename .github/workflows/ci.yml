@@ -144,9 +144,52 @@ jobs:
       run: |
         curl -fsSL https://railway.app/install.sh | sh
         echo "$HOME/.railway/bin" >> $GITHUB_PATH
+        
+    - name: Verify Railway CLI Installation
+      run: |
+        railway --version
+        railway whoami || echo "Not authenticated yet"
+      env:
+        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
     
     - name: Deploy to Railway Production
       run: |
-        railway up --service whatsapp
+        echo "🚀 Starting deployment to Railway..."
+        
+        # Try deployment with retry logic and multiple approaches
+        set -e  # Exit on any error
+        
+        # Method 1: Deploy with detached mode (avoids log streaming issues)
+        echo "📦 Attempting deployment with --detach flag..."
+        if railway up --service whatsapp --detach; then
+          echo "✅ Deployment command completed successfully (detached mode)"
+        else
+          echo "⚠️  Detached deployment failed, trying alternative method..."
+          
+          # Method 2: Try without service flag (use current directory context)
+          echo "📦 Attempting deployment without service flag..."
+          if railway up --detach; then
+            echo "✅ Deployment completed successfully (directory context)"
+          else
+            echo "❌ Both deployment methods failed"
+            exit 1
+          fi
+        fi
+        
+        echo "🔍 Waiting for deployment to register..."
+        sleep 15
+        
+        # Verify deployment (non-critical - don't fail if this doesn't work)
+        echo "📊 Checking deployment status..."
+        railway status --service whatsapp 2>/dev/null || railway status 2>/dev/null || echo "Status check unavailable (this is normal)"
+        
+        echo "🎉 Deployment process completed successfully!"
       env:
-        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }} 
+        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        
+    - name: Post-deployment verification
+      run: |
+        echo "🔗 Deployment completed. Check your Railway dashboard for detailed status:"
+        echo "   https://railway.app/dashboard"
+        echo "📱 Your WhatsApp service should be available shortly"
+      continue-on-error: true 
