@@ -46,6 +46,15 @@
    ```
 
 2. **Install dependencies**
+
+   Install the [`uv`](https://github.com/astral-sh/uv) package manager if it isn't already available:
+
+   ```bash
+   pip install uv
+   ```
+
+   Then install project dependencies:
+
    ```bash
    uv sync
    ```
@@ -99,9 +108,8 @@ src/agent/
 └── interfaces/
     └── whatsapp/           # WhatsApp API integration
 
-test/                       # Comprehensive test suite
+tests/                      # Unit tests
 scripts/                    # Database setup and debug tools
-docs/                       # Detailed system documentation
 ```
 
 ### Tech Stack
@@ -173,11 +181,9 @@ WHATSAPP_WEBHOOK_VERIFY_TOKEN=...     # Webhook verification
 
 ### For Developers
 
-1. **Run comprehensive tests**:
+1. **Run the test suite**:
    ```bash
-   python test/comprehensive_system_test.py  # 14-component validation
-   python test/test_curriculum.py           # Curriculum system
-   python test/test_assessment_system.py    # Assessment engine
+   pytest
    ```
 
 2. **Monitor system health**:
@@ -192,15 +198,11 @@ WHATSAPP_WEBHOOK_VERIFY_TOKEN=...     # Webhook verification
 
 ## 📖 Documentation
 
-Detailed documentation is available in the `/docs` folder:
-
-- **[📊 Assessment System](docs/ASSESSMENT_SYSTEM.md)** - Real-time language evaluation
-- **[🎓 Curriculum System](docs/CURRICULUM_SYSTEM.md)** - CEFR-aligned learning paths  
-- **[🔧 Debug Tools](docs/DEBUG_TOOLS.md)** - Monitoring and analytics
+Additional documentation will be published over time. For deployment details check `DEPLOYMENT.md` and see `scripts/README.md` for database utilities.
 
 ### Testing & Scripts
 
-- **[🧪 Test Suite](test/README.md)** - Comprehensive system validation
+- The `tests/` directory contains sample unit tests.
 - **[⚙️ Scripts](scripts/README.md)** - Database setup and utilities
 
 ---
@@ -238,9 +240,8 @@ pytest -q
 
 ### Component Tests
 ```bash
-python test/test_curriculum.py      # Curriculum functionality
-python test/test_assessment_system.py  # Assessment engine
-python test/test_connections.py     # Database/API connections
+pytest tests/test_memory_manager.py       # Memory manager logic
+pytest tests/test_webhook_endpoint.py     # FastAPI webhook endpoints
 ```
 
 ---

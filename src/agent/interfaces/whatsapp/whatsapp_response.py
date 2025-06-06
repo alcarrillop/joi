@@ -40,6 +40,16 @@ _processed_messages: Dict[str, float] = {}
 DEDUP_CACHE_TTL = 300  # 5 minutes
 
 
+def _is_image_message(message: Dict) -> bool:
+    """Return True if the incoming message contains image data."""
+    if message.get("type") == "image":
+        return True
+    if message.get("type") == "document":
+        mime_type = message.get("document", {}).get("mime_type", "")
+        return mime_type.startswith("image/")
+    return "image" in message
+
+
 def _is_message_already_processed(message_id: str) -> bool:
     """Check if message was already processed and clean old entries."""
     current_time = time.time()
@@ -119,23 +129,24 @@ async def whatsapp_handler(request: Request) -> Response:
 
             # Get user message and handle different message types
             content = ""
-            if message["type"] == "audio":
+            if message.get("type") == "audio":
                 content = await process_audio_message(message)
-            elif message["type"] == "image":
+            elif _is_image_message(message):
                 # Get image caption if any
                 content = message.get("image", {}).get("caption", "")
-                # Download and analyze image
-                image_bytes = await download_media(message["image"]["id"])
-                try:
-                    description = await image_to_text.analyze_image(
-                        image_bytes,
-                        "Please describe what you see in this image in the context of our conversation.",
-                    )
-                    content += f"\n[Image Analysis: {description}]"
-                except Exception as e:
-                    logger.warning(f"Failed to analyze image: {e}")
+                image_id = message.get("image", {}).get("id") or message.get("document", {}).get("id")
+                if image_id:
+                    image_bytes = await download_media(image_id)
+                    try:
+                        description = await image_to_text.analyze_image(
+                            image_bytes,
+                            "Please describe what you see in this image in the context of our conversation.",
+                        )
+                        content += f"\n[Image Analysis: {description}]"
+                    except Exception as e:
+                        logger.warning(f"Failed to analyze image: {e}")
             else:
-                content = message["text"]["body"]
+                content = message.get("text", {}).get("body", "")
 
             # Log the incoming user message
             await log_message(session_id, "user", content)

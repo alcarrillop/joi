@@ -526,6 +526,7 @@ class LearningStatsManager:
         try:
             async with conn.cursor() as cur:
                 await cur.execute("SELECT inc_word_freq(%s, %s)", (uuid.UUID(user_id), word))
+                await conn.commit()
 
         finally:
             await conn.close()
