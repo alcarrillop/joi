@@ -14,7 +14,7 @@ from typing import Dict, List
 from langchain_groq import ChatGroq
 from pydantic import BaseModel
 
-from agent.core.database import get_database_url
+from agent.core.database import get_db_connection
 from agent.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -470,63 +470,62 @@ class LearningStatsManager:
 
     async def get_user_learned_vocabulary(self, user_id: str) -> List[str]:
         """Get vocabulary already learned by user from the new relational table."""
-        database_url = get_database_url()
-        conn = await asyncpg.connect(database_url)
+        conn = await get_db_connection()
 
         try:
-            result = await conn.fetch(
-                "SELECT word FROM user_word_stats WHERE user_id = $1 ORDER BY word", uuid.UUID(user_id)
-            )
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    "SELECT word FROM user_word_stats WHERE user_id = %s ORDER BY word", (uuid.UUID(user_id),)
+                )
+                result = await cur.fetchall()
 
-            return [row["word"] for row in result]
+                return [row[0] for row in result]
 
         finally:
             await conn.close()
 
     async def get_vocabulary_word_count(self, user_id: str) -> int:
         """Return the total number of words learned by the user from the new table."""
-        database_url = get_database_url()
-        conn = await asyncpg.connect(database_url)
+        conn = await get_db_connection()
 
         try:
-            result = await conn.fetchval(
-                "SELECT COUNT(*) FROM user_word_stats WHERE user_id = $1",
-                uuid.UUID(user_id),
-            )
+            async with conn.cursor() as cur:
+                await cur.execute("SELECT COUNT(*) FROM user_word_stats WHERE user_id = %s", (uuid.UUID(user_id),))
+                result = await cur.fetchone()
 
-            return result or 0
+                return result[0] if result else 0
 
         finally:
             await conn.close()
 
     async def get_user_top_words(self, user_id: str, limit: int = 10) -> List[Dict]:
         """Get user's most frequently used words."""
-        database_url = get_database_url()
-        conn = await asyncpg.connect(database_url)
+        conn = await get_db_connection()
 
         try:
-            result = await conn.fetch(
-                """SELECT word, freq, last_used_at
-                   FROM user_word_stats
-                   WHERE user_id = $1
-                   ORDER BY freq DESC, last_used_at DESC
-                   LIMIT $2""",
-                uuid.UUID(user_id),
-                limit,
-            )
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    """SELECT word, freq, last_used_at
+                       FROM user_word_stats
+                       WHERE user_id = %s
+                       ORDER BY freq DESC, last_used_at DESC
+                       LIMIT %s""",
+                    (uuid.UUID(user_id), limit),
+                )
+                result = await cur.fetchall()
 
-            return [{"word": row["word"], "frequency": row["freq"], "last_used": row["last_used_at"]} for row in result]
+                return [{"word": row[0], "frequency": row[1], "last_used": row[2]} for row in result]
 
         finally:
             await conn.close()
 
     async def increment_word_frequency(self, user_id: str, word: str) -> None:
         """Increment the frequency of a word for a user using the PostgreSQL function."""
-        database_url = get_database_url()
-        conn = await asyncpg.connect(database_url)
+        conn = await get_db_connection()
 
         try:
-            await conn.execute("SELECT inc_word_freq($1, $2)", uuid.UUID(user_id), word)
+            async with conn.cursor() as cur:
+                await cur.execute("SELECT inc_word_freq(%s, %s)", (uuid.UUID(user_id), word))
 
         finally:
             await conn.close()
@@ -588,49 +587,52 @@ class LearningStatsManager:
     async def cleanup_user_vocabulary(self, user_id: str) -> Dict:
         """Clean up user's vocabulary by removing invalid words and duplicates from the new table."""
         try:
-            database_url = get_database_url()
-            conn = await asyncpg.connect(database_url)
+            conn = await get_db_connection()
 
             try:
-                # Get current vocabulary from new table
-                current_words = await conn.fetch(
-                    "SELECT word, freq FROM user_word_stats WHERE user_id = $1", uuid.UUID(user_id)
-                )
-
-                # Filter and normalize words
-                valid_words = []
-                removed_words = []
-
-                for row in current_words:
-                    word = row["word"]
-                    if self._is_valid_english_word(word):
-                        normalized = self._normalize_word(word)
-                        valid_words.append((normalized, row["freq"]))
-                    else:
-                        removed_words.append(word)
-
-                # Remove duplicates (keeping highest frequency)
-                word_freqs = {}
-                for word, freq in valid_words:
-                    if word in word_freqs:
-                        word_freqs[word] = max(word_freqs[word], freq)
-                    else:
-                        word_freqs[word] = freq
-
-                duplicates_removed = len(valid_words) - len(word_freqs)
-
-                # Delete all existing entries for this user
-                await conn.execute("DELETE FROM user_word_stats WHERE user_id = $1", uuid.UUID(user_id))
-
-                # Insert cleaned vocabulary
-                if word_freqs:
-                    values = [(uuid.UUID(user_id), word, freq) for word, freq in word_freqs.items()]
-
-                    await conn.executemany(
-                        """INSERT INTO user_word_stats (user_id, word, freq, created_at, last_used_at)
-                           VALUES ($1, $2, $3, NOW(), NOW())""",
-                        values,
+                async with conn.cursor() as cur:
+                    # Get current vocabulary from new table
+                    await cur.execute(
+                        "SELECT word, freq FROM user_word_stats WHERE user_id = %s", (uuid.UUID(user_id),)
                     )
+                    current_words = await cur.fetchall()
+
+                    # Filter and normalize words
+                    valid_words = []
+                    removed_words = []
+
+                    for row in current_words:
+                        word = row[0]
+                        if self._is_valid_english_word(word):
+                            normalized = self._normalize_word(word)
+                            valid_words.append((normalized, row[1]))
+                        else:
+                            removed_words.append(word)
+
+                    # Remove duplicates (keeping highest frequency)
+                    word_freqs = {}
+                    for word, freq in valid_words:
+                        if word in word_freqs:
+                            word_freqs[word] = max(word_freqs[word], freq)
+                        else:
+                            word_freqs[word] = freq
+
+                    duplicates_removed = len(valid_words) - len(word_freqs)
+
+                    # Delete all existing entries for this user
+                    await cur.execute("DELETE FROM user_word_stats WHERE user_id = %s", (uuid.UUID(user_id),))
+
+                    # Insert cleaned vocabulary
+                    if word_freqs:
+                        values = [(uuid.UUID(user_id), word, freq) for word, freq in word_freqs.items()]
+
+                        await cur.executemany(
+                            """INSERT INTO user_word_stats (user_id, word, freq, created_at, last_used_at)
+                               VALUES (%s, %s, %s, NOW(), NOW())""",
+                            values,
+                        )
+
+                    await conn.commit()
 
                 self.logger.info(
                     f"Cleaned vocabulary for user {user_id}: kept {len(word_freqs)}, removed {len(removed_words)} invalid, {duplicates_removed} duplicates"
@@ -661,23 +663,23 @@ class LearningStatsManager:
             top_words = await self.get_user_top_words(user_id, limit=5)
 
             # Get recent words (last 5)
-            database_url = get_database_url()
-            conn = await asyncpg.connect(database_url)
+            conn = await get_db_connection()
 
             try:
-                recent_words = await conn.fetch(
-                    """SELECT word, freq, last_used_at
-                       FROM user_word_stats
-                       WHERE user_id = $1
-                       ORDER BY last_used_at DESC
-                       LIMIT 5""",
-                    uuid.UUID(user_id),
-                )
+                async with conn.cursor() as cur:
+                    await cur.execute(
+                        """SELECT word, freq, last_used_at
+                           FROM user_word_stats
+                           WHERE user_id = %s
+                           ORDER BY last_used_at DESC
+                           LIMIT 5""",
+                        (uuid.UUID(user_id),),
+                    )
+                    recent_words = await cur.fetchall()
 
-                recent_words_list = [
-                    {"word": row["word"], "frequency": row["freq"], "last_used": row["last_used_at"]}
-                    for row in recent_words
-                ]
+                    recent_words_list = [
+                        {"word": row[0], "frequency": row[1], "last_used": row[2]} for row in recent_words
+                    ]
             finally:
                 await conn.close()
 

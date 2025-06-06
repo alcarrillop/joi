@@ -325,7 +325,7 @@ WhatsApp → FastAPI → LangGraph → Memory System → AI Response
 | `users` | Basic user management (id, phone, name) |
 | `sessions` | Message grouping containers |
 | `messages` | Complete conversation history |
-| `learning_stats` | Vocabulary & grammar progress |
+| `user_word_stats` | Vocabulary frequency tracking |
 | `checkpoint_*` | LangGraph workflow state |
 
 ## 🔍 Debug & Monitoring
