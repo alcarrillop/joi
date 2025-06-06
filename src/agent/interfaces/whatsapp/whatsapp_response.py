@@ -188,10 +188,17 @@ async def whatsapp_handler(request: Request) -> Response:
                 audio_buffer = output_state.values["audio_buffer"]
                 success = await send_response(from_number, response_message, "audio", audio_buffer)
             elif workflow == "image":
-                image_path = output_state.values["image_path"]
-                with open(image_path, "rb") as f:
-                    image_data = f.read()
-                success = await send_response(from_number, response_message, "image", image_data)
+                # ===== IMAGE GENERATION DISABLED =====
+                # Image generation has been disabled - respond with text instead
+                # The code below is commented out but preserved for potential future use
+
+                # image_path = output_state.values["image_path"]
+                # with open(image_path, "rb") as f:
+                #     image_data = f.read()
+                # success = await send_response(from_number, response_message, "image", image_data)
+
+                # Fallback to text response when image generation is disabled
+                success = await send_response(from_number, response_message, "text")
             else:
                 success = await send_response(from_number, response_message, "text")
 
