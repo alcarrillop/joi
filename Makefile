@@ -20,10 +20,13 @@ setup: ## Setup the project for development
 
 # Development commands
 run: ## Run the application locally
-	uv run uvicorn src.agent.interfaces.whatsapp.webhook_endpoint:app --host 0.0.0.0 --port 8000 --workers 1
+	PYTHONPATH=src uv run uvicorn src.agent.interfaces.whatsapp.webhook_endpoint:app --host 0.0.0.0 --port 8000 --workers 1
 
 run-dev: ## Run the application in development mode with reload
-	uv run uvicorn src.agent.interfaces.whatsapp.webhook_endpoint:app --host 0.0.0.0 --port 8000 --reload
+	PYTHONPATH=src uv run uvicorn src.agent.interfaces.whatsapp.webhook_endpoint:app --host 0.0.0.0 --port 8000 --reload
+
+langgraph-dev: ## Run LangGraph development server
+	PYTHONPATH=src uv run langgraph dev
 
 run-script: ## Run using the start script
 	chmod +x scripts/start.sh

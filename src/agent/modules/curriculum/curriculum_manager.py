@@ -10,6 +10,8 @@ import logging
 import uuid
 from typing import Dict, List, Optional
 
+import asyncpg
+
 from agent.core.database import get_database_url
 
 logger = logging.getLogger(__name__)
