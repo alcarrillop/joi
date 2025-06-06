@@ -87,7 +87,7 @@ async def get_user_level_info(user_id: str) -> str:
         response = "📊 **Your English Learning Progress** 📊\n\n"
         response += f"🎯 **Current Level:** {level} ({description})\n\n"
         response += f"📚 **Vocabulary Learned:** {vocab_count} English words\n"
-        response += f"💬 **Conversations:** {message_count} messages exchanged\n\n"
+        response += f"💬 **Interactions:** {message_count} messages exchanged\n\n"
 
         # Add top words with frequencies
         if top_words:
@@ -97,15 +97,39 @@ async def get_user_level_info(user_id: str) -> str:
             response += "\n"
 
         if next_level and words_needed > 0:
-            response += f"🚀 **Next Goal:** Reach {next_level} level\n"
-            response += f"📈 **Progress:** {progress_percent:.1f}% to {next_level}\n"
-            response += f"🎯 **Words Needed:** {words_needed} more vocabulary words\n\n"
+            # Calculate progress within current level instead of confusing "progress to next"
+            current_threshold = level_progress.get("current_level_threshold", 0)
+            previous_threshold = level_progress.get("previous_level_threshold", 0)
+
+            # Progress within current level
+            if current_threshold > previous_threshold:
+                level_progress_percent = (
+                    (vocab_count - previous_threshold) / (current_threshold - previous_threshold)
+                ) * 100
+                level_progress_percent = min(100, max(0, level_progress_percent))
+
+                # Check if they've completed their current level
+                if vocab_count >= current_threshold:
+                    response += f"🚀 **Next Goal:** Reach {next_level} level\n"
+                    response += f"📈 **Progress:** Ready to advance! You've completed {level}\n"
+                    response += f"🎯 **Words for {next_level}:** {words_needed} more vocabulary words\n\n"
+                else:
+                    words_to_complete_current = current_threshold - vocab_count
+                    response += f"🚀 **Current Goal:** Complete {level} level\n"
+                    response += f"📈 **Progress in {level}:** {level_progress_percent:.1f}% complete\n"
+                    response += (
+                        f"🎯 **Words to complete {level}:** {words_to_complete_current} more vocabulary words\n\n"
+                    )
+            else:
+                response += f"🚀 **Next Goal:** Reach {next_level} level\n"
+                response += f"📈 **Progress:** {progress_percent:.1f}% to {next_level}\n"
+                response += f"🎯 **Words Needed:** {words_needed} more vocabulary words\n\n"
         elif vocab_count >= 600:
             response += "🏆 **Congratulations!** You're at an advanced level!\n\n"
 
         # Add encouraging context based on level
         if vocab_count < 25:
-            response += "Keep chatting with me! Every conversation teaches you new words. 🌱"
+            response += "Keep chatting with me! Every interaction teaches you new words. 🌱"
         elif vocab_count < 100:
             response += "Great progress! You're building a solid foundation. Keep going! 💪"
         elif vocab_count < 300:

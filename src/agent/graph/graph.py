@@ -6,6 +6,7 @@ from agent.graph.edges import (
     select_workflow,
     should_summarize_conversation,
 )
+from agent.graph.memory_nodes import memory_extraction_node, memory_injection_node
 from agent.graph.nodes import (
     audio_node,
     context_injection_node,
@@ -15,7 +16,6 @@ from agent.graph.nodes import (
     router_node,
     summarize_conversation_node,
 )
-from agent.graph.memory_nodes import memory_extraction_node, memory_injection_node
 from agent.graph.state import AICompanionState
 
 

@@ -1,17 +1,15 @@
 """Async wrapper around Qdrant vector store operations."""
+
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
-from datetime import datetime
 from functools import lru_cache
 from typing import List, Optional
 
-from qdrant_client import AsyncQdrantClient
-from qdrant_client.models import Distance, Filter, FieldCondition, MatchValue, PointStruct, VectorParams
-from sentence_transformers import SentenceTransformer
-
 from agent.settings import get_settings
+from qdrant_client import AsyncQdrantClient
+from qdrant_client.models import Distance, FieldCondition, Filter, MatchValue, PointStruct, VectorParams
+from sentence_transformers import SentenceTransformer
 
 
 @dataclass
@@ -42,7 +40,9 @@ class AsyncVectorStore:
     async def store_memory(self, text: str, metadata: dict) -> None:
         await self._ensure_collection()
         embedding = self.model.encode(text)
-        point = PointStruct(id=metadata.get("id", hash(text)), vector=embedding.tolist(), payload={"text": text, **metadata})
+        point = PointStruct(
+            id=metadata.get("id", hash(text)), vector=embedding.tolist(), payload={"text": text, **metadata}
+        )
         await self.client.upsert(collection_name=self.COLLECTION_NAME, points=[point])
 
     async def search_memories(self, query: str, user_id: str, k: int = 5) -> List[Memory]:

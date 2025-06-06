@@ -91,6 +91,7 @@ class SimplifiedCurriculumManager:
             message_count = stats.get("total_messages", 0)
 
             # CEFR level estimation based on vocabulary thresholds
+            # Fixed logic: check requirements properly
             if vocab_count >= 400 and message_count >= 250:
                 estimated_level = "C1"
             elif vocab_count >= 250 and message_count >= 150:
@@ -104,16 +105,28 @@ class SimplifiedCurriculumManager:
 
             next_level = self.get_next_level(estimated_level)
 
-            # Calculate progress to next level
+            # Calculate progress to next level - FIXED LOGIC
             level_thresholds = {"A1": 75, "A2": 150, "B1": 250, "B2": 400, "C1": 600, "C2": 800}
 
+            # Get current and previous thresholds
             current_threshold = level_thresholds.get(estimated_level, 0)
+
+            # For progress calculation, we need the previous level's threshold
+            levels = self.get_level_progression()
+            try:
+                current_index = levels.index(estimated_level)
+                previous_level = levels[current_index - 1] if current_index > 0 else None
+            except ValueError:
+                previous_level = None
+
+            previous_threshold = level_thresholds.get(previous_level, 0) if previous_level else 0
             next_threshold = level_thresholds.get(next_level, current_threshold) if next_level else current_threshold
 
             progress_to_next = 0
             if next_level and next_threshold > current_threshold:
+                # Progress from previous level to next level
                 progress_to_next = min(
-                    100, ((vocab_count - current_threshold) / (next_threshold - current_threshold)) * 100
+                    100, ((vocab_count - previous_threshold) / (next_threshold - previous_threshold)) * 100
                 )
 
             return {
@@ -123,6 +136,8 @@ class SimplifiedCurriculumManager:
                 "total_messages": message_count,
                 "progress_to_next_level": max(0, progress_to_next),
                 "words_needed_for_next_level": max(0, next_threshold - vocab_count) if next_level else 0,
+                "current_level_threshold": current_threshold,
+                "previous_level_threshold": previous_threshold,
                 "progress_indicators": {
                     "vocabulary_strength": min(100, (vocab_count / 600) * 100),  # Max at C1 level
                     "conversation_practice": min(100, (message_count / 300) * 100),

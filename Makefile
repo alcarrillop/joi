@@ -22,6 +22,8 @@ setup: ## Setup the project for development
 run: ## Run the application locally
 	PYTHONPATH=src uv run uvicorn src.agent.interfaces.whatsapp.webhook_endpoint:app --host 0.0.0.0 --port 8000 --workers 1
 
+start: run ## Alias for run (start the application)
+
 run-dev: ## Run the application in development mode with reload
 	PYTHONPATH=src uv run uvicorn src.agent.interfaces.whatsapp.webhook_endpoint:app --host 0.0.0.0 --port 8000 --reload
 
@@ -34,13 +36,13 @@ run-script: ## Run using the start script
 
 # Testing
 test: ## Run tests
-	uv run pytest
+	uv run pytest tests/
 
 test-cov: ## Run tests with coverage
-	uv run pytest --cov=src --cov-report=html --cov-report=term
+	uv run pytest tests/ --cov=src --cov-report=html --cov-report=term
 
 test-watch: ## Run tests in watch mode
-	uv run pytest -f
+	uv run pytest tests/ -f
 
 # Code quality
 lint: ## Run linting
@@ -59,7 +61,7 @@ check: ## Run all checks (lint + format + tests)
 	@echo "Running all checks..."
 	uv run ruff check .
 	uv run ruff format . --check
-	uv run pytest
+	uv run pytest tests/
 
 pre-commit: ## Run pre-commit hooks
 	uv run pre-commit run --all-files
@@ -107,7 +109,7 @@ quick-check: lint test ## Quick check before commit
 ci: ## Run CI-like checks
 	uv run ruff check .
 	uv run ruff format . --check
-	uv run pytest --cov=src
+	uv run pytest tests/ --cov=src
 
 # Local development server
 serve: run-dev ## Alias for run-dev

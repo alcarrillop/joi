@@ -34,8 +34,8 @@ CREATE TABLE IF NOT EXISTS user_word_stats (
     user_id      UUID        REFERENCES users(id) ON DELETE CASCADE,
     word         TEXT        NOT NULL,
     freq         INT         NOT NULL DEFAULT 1,
-    last_used_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_used_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (user_id, word)
 );
 
@@ -59,7 +59,7 @@ BEGIN
     ON CONFLICT (user_id, word)
     DO UPDATE SET
         freq = user_word_stats.freq + 1,
-        last_used_at = NOW();
+        last_used_at = now();
 END;
 $$;
 
