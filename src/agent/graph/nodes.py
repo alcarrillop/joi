@@ -253,18 +253,14 @@ async def summarize_conversation_node(state: AICompanionState):
 
 async def learning_stats_update_node(state: AICompanionState):
     """Update learning statistics based on user's message."""
-    user_id = state.get("user_id", "unknown")
-    session_id = state.get("session_id", "unknown")
+    user_id = state.get("user_id")
+    session_id = state.get("session_id")
 
     workflow_logger.info(f"[LEARNING_STATS] Updating learning stats for user {user_id}")
 
     if not state["messages"]:
         workflow_logger.warning(f"[LEARNING_STATS] No messages to process for user {user_id}")
         return {}
-
-    # Get user_id and session_id from state
-    user_id = state.get("user_id")
-    session_id = state.get("session_id")
 
     if not user_id or not session_id:
         workflow_logger.warning("[LEARNING_STATS] Missing user context for learning stats update")
