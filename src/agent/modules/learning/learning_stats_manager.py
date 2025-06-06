@@ -473,13 +473,11 @@ class LearningStatsManager:
         conn = await get_db_connection()
 
         try:
-            async with conn.cursor() as cur:
-                await cur.execute(
-                    "SELECT word FROM user_word_stats WHERE user_id = %s ORDER BY word", (uuid.UUID(user_id),)
-                )
-                result = await cur.fetchall()
-
-                return [row[0] for row in result]
+            result = await conn.fetch(
+                "SELECT word FROM user_word_stats WHERE user_id = $1 ORDER BY word",
+                uuid.UUID(user_id),
+            )
+            return [row[0] for row in result]
 
         finally:
             await conn.close()
@@ -489,11 +487,11 @@ class LearningStatsManager:
         conn = await get_db_connection()
 
         try:
-            async with conn.cursor() as cur:
-                await cur.execute("SELECT COUNT(*) FROM user_word_stats WHERE user_id = %s", (uuid.UUID(user_id),))
-                result = await cur.fetchone()
-
-                return result[0] if result else 0
+            result = await conn.fetchval(
+                "SELECT COUNT(*) FROM user_word_stats WHERE user_id = $1",
+                uuid.UUID(user_id),
+            )
+            return result if result else 0
 
         finally:
             await conn.close()
@@ -503,18 +501,17 @@ class LearningStatsManager:
         conn = await get_db_connection()
 
         try:
-            async with conn.cursor() as cur:
-                await cur.execute(
-                    """SELECT word, freq, last_used_at
+            result = await conn.fetch(
+                """SELECT word, freq, last_used_at
                        FROM user_word_stats
-                       WHERE user_id = %s
+                       WHERE user_id = $1
                        ORDER BY freq DESC, last_used_at DESC
-                       LIMIT %s""",
-                    (uuid.UUID(user_id), limit),
-                )
-                result = await cur.fetchall()
+                       LIMIT $2""",
+                uuid.UUID(user_id),
+                limit,
+            )
 
-                return [{"word": row[0], "frequency": row[1], "last_used": row[2]} for row in result]
+            return [{"word": row[0], "frequency": row[1], "last_used": row[2]} for row in result]
 
         finally:
             await conn.close()
@@ -524,9 +521,7 @@ class LearningStatsManager:
         conn = await get_db_connection()
 
         try:
-            async with conn.cursor() as cur:
-                await cur.execute("SELECT inc_word_freq(%s, %s)", (uuid.UUID(user_id), word))
-                await conn.commit()
+            await conn.execute("SELECT inc_word_freq($1, $2)", uuid.UUID(user_id), word)
 
         finally:
             await conn.close()
@@ -591,49 +586,46 @@ class LearningStatsManager:
             conn = await get_db_connection()
 
             try:
-                async with conn.cursor() as cur:
-                    # Get current vocabulary from new table
-                    await cur.execute(
-                        "SELECT word, freq FROM user_word_stats WHERE user_id = %s", (uuid.UUID(user_id),)
+                # Get current vocabulary from new table
+                current_words = await conn.fetch(
+                    "SELECT word, freq FROM user_word_stats WHERE user_id = $1",
+                    uuid.UUID(user_id),
+                )
+
+                # Filter and normalize words
+                valid_words = []
+                removed_words = []
+
+                for row in current_words:
+                    word = row[0]
+                    if self._is_valid_english_word(word):
+                        normalized = self._normalize_word(word)
+                        valid_words.append((normalized, row[1]))
+                    else:
+                        removed_words.append(word)
+
+                # Remove duplicates (keeping highest frequency)
+                word_freqs = {}
+                for word, freq in valid_words:
+                    if word in word_freqs:
+                        word_freqs[word] = max(word_freqs[word], freq)
+                    else:
+                        word_freqs[word] = freq
+
+                duplicates_removed = len(valid_words) - len(word_freqs)
+
+                # Delete all existing entries for this user
+                await conn.execute("DELETE FROM user_word_stats WHERE user_id = $1", uuid.UUID(user_id))
+
+                # Insert cleaned vocabulary
+                if word_freqs:
+                    values = [(uuid.UUID(user_id), word, freq) for word, freq in word_freqs.items()]
+
+                    await conn.executemany(
+                        """INSERT INTO user_word_stats (user_id, word, freq, created_at, last_used_at)
+                           VALUES ($1, $2, $3, NOW(), NOW())""",
+                        values,
                     )
-                    current_words = await cur.fetchall()
-
-                    # Filter and normalize words
-                    valid_words = []
-                    removed_words = []
-
-                    for row in current_words:
-                        word = row[0]
-                        if self._is_valid_english_word(word):
-                            normalized = self._normalize_word(word)
-                            valid_words.append((normalized, row[1]))
-                        else:
-                            removed_words.append(word)
-
-                    # Remove duplicates (keeping highest frequency)
-                    word_freqs = {}
-                    for word, freq in valid_words:
-                        if word in word_freqs:
-                            word_freqs[word] = max(word_freqs[word], freq)
-                        else:
-                            word_freqs[word] = freq
-
-                    duplicates_removed = len(valid_words) - len(word_freqs)
-
-                    # Delete all existing entries for this user
-                    await cur.execute("DELETE FROM user_word_stats WHERE user_id = %s", (uuid.UUID(user_id),))
-
-                    # Insert cleaned vocabulary
-                    if word_freqs:
-                        values = [(uuid.UUID(user_id), word, freq) for word, freq in word_freqs.items()]
-
-                        await cur.executemany(
-                            """INSERT INTO user_word_stats (user_id, word, freq, created_at, last_used_at)
-                               VALUES (%s, %s, %s, NOW(), NOW())""",
-                            values,
-                        )
-
-                    await conn.commit()
 
                 self.logger.info(
                     f"Cleaned vocabulary for user {user_id}: kept {len(word_freqs)}, removed {len(removed_words)} invalid, {duplicates_removed} duplicates"
@@ -667,20 +659,16 @@ class LearningStatsManager:
             conn = await get_db_connection()
 
             try:
-                async with conn.cursor() as cur:
-                    await cur.execute(
-                        """SELECT word, freq, last_used_at
+                recent_words = await conn.fetch(
+                    """SELECT word, freq, last_used_at
                            FROM user_word_stats
-                           WHERE user_id = %s
+                           WHERE user_id = $1
                            ORDER BY last_used_at DESC
                            LIMIT 5""",
-                        (uuid.UUID(user_id),),
-                    )
-                    recent_words = await cur.fetchall()
+                    uuid.UUID(user_id),
+                )
 
-                    recent_words_list = [
-                        {"word": row[0], "frequency": row[1], "last_used": row[2]} for row in recent_words
-                    ]
+                recent_words_list = [{"word": row[0], "frequency": row[1], "last_used": row[2]} for row in recent_words]
             finally:
                 await conn.close()
 

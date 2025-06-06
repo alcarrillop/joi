@@ -10,7 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Dict
 
-import psycopg
+import asyncpg
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 # Global flag to track if setup has been done
@@ -29,13 +29,9 @@ def get_database_url() -> str:
 
 
 async def get_db_connection():
-    """Get a database connection with Supabase-compatible parameters using psycopg3."""
+    """Get a database connection using asyncpg."""
     database_url = get_database_url()
-    return await psycopg.AsyncConnection.connect(
-        database_url,
-        autocommit=False,
-        connect_timeout=30,
-    )
+    return await asyncpg.connect(database_url, timeout=30)
 
 
 async def execute_sql_script(script_path: str):
@@ -50,13 +46,10 @@ async def execute_sql_script(script_path: str):
     # Connect and execute
     conn = await get_db_connection()
     try:
-        async with conn.cursor() as cur:
-            await cur.execute(sql_content)
-        await conn.commit()
+        await conn.execute(sql_content)
         logger.info("SQL script executed successfully: %s", script_path)
     except Exception as e:
         logger.error("Error executing SQL script %s: %s", script_path, e)
-        await conn.rollback()
         raise
     finally:
         await conn.close()
@@ -82,39 +75,35 @@ async def get_or_create_user(phone_number: str, name: str = None) -> str:
     conn = await get_db_connection()
 
     try:
-        async with conn.cursor() as cur:
-            # Try to find existing user
-            await cur.execute("SELECT id FROM users WHERE phone_number = %s", (phone_number,))
-            user = await cur.fetchone()
+        # Try to find existing user
+        user = await conn.fetchrow("SELECT id FROM users WHERE phone_number = $1", phone_number)
 
-            if user:
-                # Update name if provided and not already set
-                if name:
-                    await cur.execute(
-                        "UPDATE users SET name = %s WHERE id = %s AND (name IS NULL OR name = '')", (name, user[0])
-                    )
-                    await conn.commit()
-                return str(user[0])
+        if user:
+            # Update name if provided and not already set
+            if name:
+                await conn.execute(
+                    "UPDATE users SET name = $1 WHERE id = $2 AND (name IS NULL OR name = '')",
+                    name,
+                    user[0],
+                )
+            return str(user[0])
 
-            # Create new user with name if provided
-            await cur.execute(
-                "INSERT INTO users (phone_number, name) VALUES (%s, %s) RETURNING id", (phone_number, name)
-            )
-            user_result = await cur.fetchone()
-            user_id = user_result[0]
-            await conn.commit()
+        # Create new user with name if provided
+        user_result = await conn.fetchrow(
+            "INSERT INTO users (phone_number, name) VALUES ($1, $2) RETURNING id",
+            phone_number,
+            name,
+        )
+        user_id = user_result[0]
 
-            logger.info(
-                "Created new user %s with ID %s%s",
-                phone_number,
-                user_id,
-                f" and name: {name}" if name else "",
-            )
-            return str(user_id)
+        logger.info(
+            "Created new user %s with ID %s%s",
+            phone_number,
+            user_id,
+            f" and name: {name}" if name else "",
+        )
+        return str(user_id)
 
-    except Exception:
-        await conn.rollback()
-        raise
     finally:
         await conn.close()
 
@@ -124,17 +113,13 @@ async def update_user_name(user_id: str, name: str):
     conn = await get_db_connection()
 
     try:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                "UPDATE users SET name = %s WHERE id = %s AND (name IS NULL OR name = '')",
-                (name, uuid.UUID(user_id)),
-            )
-        await conn.commit()
+        await conn.execute(
+            "UPDATE users SET name = $1 WHERE id = $2 AND (name IS NULL OR name = '')",
+            name,
+            uuid.UUID(user_id),
+        )
         logger.info("Updated name for user %s: %s", user_id, name)
 
-    except Exception:
-        await conn.rollback()
-        raise
     finally:
         await conn.close()
 
@@ -144,31 +129,25 @@ async def get_or_create_session(user_id: str) -> str:
     conn = await get_db_connection()
 
     try:
-        async with conn.cursor() as cur:
-            # Try to find the most recent session for the user
-            await cur.execute(
-                "SELECT id FROM sessions WHERE user_id = %s ORDER BY started_at DESC LIMIT 1", (uuid.UUID(user_id),)
-            )
-            session = await cur.fetchone()
+        # Try to find the most recent session for the user
+        session = await conn.fetchrow(
+            "SELECT id FROM sessions WHERE user_id = $1 ORDER BY started_at DESC LIMIT 1",
+            uuid.UUID(user_id),
+        )
 
-            if session:
-                return str(session[0])
+        if session:
+            return str(session[0])
 
-            # Create new session
-            await cur.execute(
-                "INSERT INTO sessions (user_id) VALUES (%s) RETURNING id",
-                (uuid.UUID(user_id),),
-            )
-            session_result = await cur.fetchone()
-            session_id = session_result[0]
-            await conn.commit()
+        # Create new session
+        session_result = await conn.fetchrow(
+            "INSERT INTO sessions (user_id) VALUES ($1) RETURNING id",
+            uuid.UUID(user_id),
+        )
+        session_id = session_result[0]
 
-            logger.info("Created new session %s for user %s", session_id, user_id)
-            return str(session_id)
+        logger.info("Created new session %s for user %s", session_id, user_id)
+        return str(session_id)
 
-    except Exception:
-        await conn.rollback()
-        raise
     finally:
         await conn.close()
 
@@ -178,17 +157,14 @@ async def log_message(session_id: str, sender: str, message: str):
     conn = await get_db_connection()
 
     try:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                "INSERT INTO messages (session_id, sender, message) VALUES (%s, %s, %s)",
-                (uuid.UUID(session_id), sender, message),
-            )
-        await conn.commit()
+        await conn.execute(
+            "INSERT INTO messages (session_id, sender, message) VALUES ($1, $2, $3)",
+            uuid.UUID(session_id),
+            sender,
+            message,
+        )
         logger.debug("Logged %s message for session %s", sender, session_id)
 
-    except Exception:
-        await conn.rollback()
-        raise
     finally:
         await conn.close()
 
@@ -198,17 +174,14 @@ async def get_user_stats(user_id: str) -> Dict:
     conn = await get_db_connection()
 
     try:
-        async with conn.cursor() as cur:
-            # Get vocabulary from the new user_word_stats table
-            await cur.execute(
-                "SELECT word FROM user_word_stats WHERE user_id = %s ORDER BY word",
-                (uuid.UUID(user_id),),
-            )
-            vocab_words = await cur.fetchall()
+        vocab_words = await conn.fetch(
+            "SELECT word FROM user_word_stats WHERE user_id = $1 ORDER BY word",
+            uuid.UUID(user_id),
+        )
 
-            return {
-                "vocab_learned": [row[0] for row in vocab_words],
-            }
+        return {
+            "vocab_learned": [row[0] for row in vocab_words],
+        }
 
     except Exception as e:
         logger.error(f"Error getting user stats: {e}")

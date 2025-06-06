@@ -32,7 +32,7 @@ async def simple_health_check():
 @app.get("/debug/db-test")
 async def test_database_connection():
     """Test database connectivity for debugging."""
-    import psycopg
+    import asyncpg
 
     try:
         database_url = os.getenv("DATABASE_URL")
@@ -46,28 +46,19 @@ async def test_database_connection():
         has_special_chars = any(char in database_url for char in ["@", "#", "$", "%", "&", "+", "/", "?"])
         protocol = database_url.split("://")[0] if "://" in database_url else "unknown"
 
-        # Test basic connection with psycopg3
-        conn = await psycopg.AsyncConnection.connect(
-            database_url,
-            autocommit=False,
-            connect_timeout=30,
-        )
+        # Test basic connection with asyncpg
+        conn = await asyncpg.connect(database_url, timeout=30)
 
         # Test a simple query
-        async with conn.cursor() as cur:
-            await cur.execute("SELECT 1")
-            result = await cur.fetchone()
-            test_query_result = result[0]
-
-            # Test table creation capability
-            await cur.execute("SELECT NOW()")
-            await cur.fetchone()
+        test_query_result = await conn.fetchval("SELECT 1")
+        # Test table creation capability
+        await conn.execute("SELECT NOW()")
 
         await conn.close()
 
         return {
             "status": "success",
-            "message": "Database connection successful with psycopg3",
+            "message": "Database connection successful with asyncpg",
             "host_info": url_info,
             "test_query": test_query_result,
             "protocol": protocol,
