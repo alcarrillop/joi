@@ -59,7 +59,8 @@ class SpeechToText:
                     transcription = self.client.audio.transcriptions.create(
                         file=audio_file,
                         model=self.model,
-                        language="en",
+                        # Removed language="en" to allow automatic language detection
+                        # This allows transcription in the original language (Spanish, English, etc.)
                         response_format="text",
                     )
 
