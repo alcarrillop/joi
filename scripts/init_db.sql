@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS messages (
     session_id UUID REFERENCES sessions(id),
     sender TEXT CHECK (sender IN ('user', 'agent')),
     message TEXT NOT NULL,
+    message_type TEXT CHECK (message_type IN ('text', 'audio', 'image')) DEFAULT 'text',
     timestamp TIMESTAMPTZ DEFAULT now()
 );
 
@@ -43,6 +44,7 @@ CREATE INDEX IF NOT EXISTS idx_users_phone_number ON users(phone_number);
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_messages_session_id ON messages(session_id);
 CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp);
+CREATE INDEX IF NOT EXISTS idx_messages_type ON messages(message_type);
 CREATE INDEX IF NOT EXISTS idx_word_stats_user_freq ON user_word_stats (user_id, freq DESC);
 CREATE INDEX IF NOT EXISTS idx_word_stats_last_used ON user_word_stats (user_id, last_used_at DESC);
 
@@ -93,6 +95,7 @@ $$;
 COMMENT ON TABLE users IS 'Usuarios registrados del sistema de aprendizaje';
 COMMENT ON TABLE sessions IS 'Sesiones de conversación simplificadas para agrupar mensajes';
 COMMENT ON TABLE messages IS 'Mensajes individuales dentro de sesiones';
+COMMENT ON COLUMN messages.message_type IS 'Tipo de mensaje: text, audio, o image. Usuarios pueden enviar todos los tipos, agentes envían text/audio únicamente';
 COMMENT ON TABLE user_word_stats IS 'Tabla relacional para tracking de vocabulario con frecuencias de uso';
 
 COMMENT ON COLUMN user_word_stats.word IS 'Palabra en forma singular/base normalizada';

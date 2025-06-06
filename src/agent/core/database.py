@@ -152,18 +152,28 @@ async def get_or_create_session(user_id: str) -> str:
         await conn.close()
 
 
-async def log_message(session_id: str, sender: str, message: str):
-    """Log a message to the messages table."""
+async def log_message(session_id: str, sender: str, message: str, message_type: str = "text"):
+    """Log a message to the messages table with type information.
+
+    Args:
+        session_id: Session identifier
+        sender: 'user' or 'agent'
+        message: Message content
+        message_type: Type of message ('text', 'audio', 'image')
+                     Users can send: text, audio, image
+                     Agents can send: text, audio
+    """
     conn = await get_db_connection()
 
     try:
         await conn.execute(
-            "INSERT INTO messages (session_id, sender, message) VALUES ($1, $2, $3)",
+            "INSERT INTO messages (session_id, sender, message, message_type) VALUES ($1, $2, $3, $4)",
             uuid.UUID(session_id),
             sender,
             message,
+            message_type,
         )
-        logger.debug("Logged %s message for session %s", sender, session_id)
+        logger.debug("Logged %s %s message for session %s", sender, message_type, session_id)
 
     finally:
         await conn.close()

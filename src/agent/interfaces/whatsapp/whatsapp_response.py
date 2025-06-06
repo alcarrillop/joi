@@ -129,9 +129,20 @@ async def whatsapp_handler(request: Request) -> Response:
 
             # Get user message and handle different message types
             content = ""
+            user_message_type = "text"  # Default type
+
+            # Debug: Log the incoming message structure
+            logger.info(f"[DEBUG] Message structure for {from_number}: {message}")
+            logger.info(f"[DEBUG] Message type field: {message.get('type')}")
+
             if message.get("type") == "audio":
+                logger.info(f"[DEBUG] Processing audio message for {from_number}")
                 content = await process_audio_message(message)
+                user_message_type = "audio"
+                logger.info(f"[DEBUG] Audio transcription result: {content}")
             elif _is_image_message(message):
+                logger.info(f"[DEBUG] Processing image message for {from_number}")
+                user_message_type = "image"
                 # Get image caption if any
                 content = message.get("image", {}).get("caption", "")
                 image_id = message.get("image", {}).get("id") or message.get("document", {}).get("id")
@@ -153,10 +164,14 @@ async def whatsapp_handler(request: Request) -> Response:
                     logger.warning(f"Image message received but no image ID found for user {from_number}")
                     content += "\n[Image received but no image data found]"
             else:
+                logger.info(f"[DEBUG] Processing text message for {from_number}")
                 content = message.get("text", {}).get("body", "")
+                user_message_type = "text"
 
-            # Log the incoming user message
-            await log_message(session_id, "user", content)
+            logger.info(f"[DEBUG] Final message type: {user_message_type}, content length: {len(content)}")
+
+            # Log the incoming user message with type
+            await log_message(session_id, "user", content, user_message_type)
 
             # Process message through the graph agent
             async with await get_checkpointer() as checkpointer:
@@ -180,8 +195,14 @@ async def whatsapp_handler(request: Request) -> Response:
             workflow = output_state.values.get("workflow", "conversation")
             response_message = output_state.values["messages"][-1].content
 
-            # Log the agent response
-            await log_message(session_id, "agent", response_message)
+            # Determine agent response type based on workflow
+            agent_message_type = "text"  # Default type
+            if workflow == "audio":
+                agent_message_type = "audio"
+            # Note: Image generation is disabled, so agent only sends text/audio
+
+            # Log the agent response with type
+            await log_message(session_id, "agent", response_message, agent_message_type)
 
             # Handle different response types based on workflow
             if workflow == "audio":
