@@ -19,8 +19,9 @@ class ImageToText:
         """Initialize the ImageToText class and validate environment variables."""
         self._validate_env_vars()
         settings = get_settings()
+        self.model_name = settings.ITT_MODEL_NAME
         self.groq_client = ChatGroq(
-            model=settings.ITT_MODEL_NAME,
+            model=self.model_name,
             api_key=settings.GROQ_API_KEY,
             temperature=0.3,
         )
@@ -68,7 +69,7 @@ class ImageToText:
             if not prompt:
                 prompt = "Please describe what you see in this image in detail."
 
-            self.logger.info(f"Using model: {self.groq_client.model} for image analysis")
+            self.logger.info(f"Using model: {self.model_name} for image analysis")
             self.logger.info(f"Analysis prompt: {prompt}")
 
             # Create the message for LangChain ChatGroq
