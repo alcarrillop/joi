@@ -3,6 +3,7 @@ import logging
 import os
 from typing import Union
 
+from langchain_core.messages import HumanMessage
 from langchain_groq import ChatGroq
 
 from agent.core.exceptions import ImageToTextError
@@ -58,6 +59,8 @@ class ImageToText:
             if not image_bytes:
                 raise ValueError("Image data cannot be empty")
 
+            self.logger.info(f"Processing image of size: {len(image_bytes)} bytes")
+
             # Convert image to base64
             base64_image = base64.b64encode(image_bytes).decode("utf-8")
 
@@ -65,35 +68,30 @@ class ImageToText:
             if not prompt:
                 prompt = "Please describe what you see in this image in detail."
 
-            # Create the messages for the vision API
-            messages = [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
-                        },
-                    ],
-                }
+            self.logger.info(f"Using model: {self.groq_client.model} for image analysis")
+            self.logger.info(f"Analysis prompt: {prompt}")
+
+            # Create the message for LangChain ChatGroq
+            message_content = [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}},
             ]
 
-            # Make the API call
-            settings = get_settings()
-            response = self.groq_client.chat.completions.create(
-                model=settings.ITT_MODEL_NAME,
-                messages=messages,
-                max_tokens=1000,
-            )
+            message = HumanMessage(content=message_content)
 
-            if not response.choices:
+            # Make the API call using LangChain ChatGroq
+            self.logger.info("Making API call to Groq vision model...")
+            response = await self.groq_client.ainvoke([message])
+
+            if not response or not response.content:
+                self.logger.error("No response received from vision model")
                 raise ImageToTextError("No response received from the vision model")
 
-            description = response.choices[0].message.content
+            description = response.content
             self.logger.info(f"Generated image description: {description}")
 
             return description
 
         except Exception as e:
+            self.logger.error(f"Image analysis failed: {str(e)}")
             raise ImageToTextError(f"Failed to analyze image: {str(e)}") from e

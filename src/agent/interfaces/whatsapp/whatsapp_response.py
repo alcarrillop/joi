@@ -138,13 +138,20 @@ async def whatsapp_handler(request: Request) -> Response:
                 if image_id:
                     image_bytes = await download_media(image_id)
                     try:
+                        logger.info(f"Analyzing image for user {from_number}, image size: {len(image_bytes)} bytes")
                         description = await image_to_text.analyze_image(
                             image_bytes,
                             "Please describe what you see in this image in the context of our conversation.",
                         )
                         content += f"\n[Image Analysis: {description}]"
+                        logger.info(f"Image analysis successful for user {from_number}")
                     except Exception as e:
-                        logger.warning(f"Failed to analyze image: {e}")
+                        logger.error(f"Failed to analyze image for user {from_number}: {e}")
+                        # Add a note about the failed analysis so the conversation can continue
+                        content += "\n[Image received but analysis failed - I can see you sent an image but can't analyze it right now]"
+                else:
+                    logger.warning(f"Image message received but no image ID found for user {from_number}")
+                    content += "\n[Image received but no image data found]"
             else:
                 content = message.get("text", {}).get("body", "")
 
