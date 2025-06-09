@@ -76,3 +76,4 @@ cloudbuild.yaml
 # Other project files
 LICENSE
 DEPLOYMENT.md 
+data/
