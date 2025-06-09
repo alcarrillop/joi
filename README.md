@@ -1,13 +1,8 @@
 # 🤖 Joi - Your English Practice AI Agent
 
 <p align="center">
-    <img alt="Joi Logo" src="img/joi_logo.png" width="200" />
     <h1 align="center">📱 Joi 📱</h1>
     <h3 align="center">Practice English Every Day on WhatsApp</h3>
-</p>
-
-<p align="center">
-    <img alt="WhatsApp Logo" src="img/whatsapp_logo.png" width="100" />
 </p>
 
 ## 🎯 What is Joi?
