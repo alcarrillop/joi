@@ -228,17 +228,42 @@ async def get_session_messages(session_id: str):
 
 @debug_router.get("/users/{user_id}/learning-stats")
 async def get_user_learning_statistics(user_id: str):
-    """Get learning statistics for a user."""
+    """Get comprehensive learning statistics for a user."""
     try:
-        learning_stats_manager = get_learning_stats_manager()
-        stats = await learning_stats_manager.get_learning_summary(user_id)
+        # Import here to avoid circular imports
+        from agent.modules.curriculum.curriculum_manager import get_curriculum_manager
 
+        # Get enhanced curriculum-based analysis
+        curriculum_manager = get_curriculum_manager()
+        curriculum_progress = await curriculum_manager.estimate_level_progress(user_id)
+
+        # Get basic technical stats from learning manager
+        learning_stats_manager = get_learning_stats_manager()
+        basic_stats = await learning_stats_manager.get_learning_summary(user_id)
+        top_words = await learning_stats_manager.get_user_top_words(user_id, limit=10)
+
+        # Get memory stats
         memory_manager = get_memory_manager()
         memory_stats = memory_manager.get_user_memory_stats(user_id)
 
         return {
             "user_id": user_id,
-            "learning_stats": stats,
+            "curriculum_analysis": {
+                "estimated_level": curriculum_progress.get("estimated_level", "A1"),
+                "vocabulary_learned": curriculum_progress.get("vocabulary_learned", 0),
+                "curriculum_mastery": curriculum_progress.get("curriculum_insights", {}).get(
+                    "curriculum_mastery_percentage", 0
+                ),
+                "educational_recommendations": curriculum_progress.get("educational_recommendations", []),
+                "level_competencies": curriculum_progress.get("level_competencies", []),
+                "progress_to_next_level": curriculum_progress.get("progress_to_next_level", 0),
+                "next_level": curriculum_progress.get("next_level"),
+            },
+            "technical_stats": {
+                "vocabulary_summary": basic_stats.get("vocabulary", {}),
+                "top_words": top_words,
+                "word_statistics": basic_stats.get("statistics", {}),
+            },
             "memory_stats": memory_stats,
         }
     except Exception as e:
@@ -373,9 +398,10 @@ async def debug_dashboard():
 
         <div class="stats">
             <h2>📊 System Status</h2>
-            <p><strong>Memory-Focused Architecture:</strong> Simplified for production</p>
+            <p><strong>Enhanced Curriculum Architecture:</strong> CEFR-based learning with adaptive content</p>
             <p><strong>Core Tables:</strong> users, sessions, messages, user_word_stats</p>
             <p><strong>Vector Store:</strong> Qdrant for semantic memory</p>
+            <p><strong>Learning System:</strong> Curriculum + Technical tracking separation</p>
         </div>
 
         <h2>🔗 Available Endpoints</h2>
@@ -391,7 +417,7 @@ async def debug_dashboard():
             <p><code>GET /debug/users/{user_id}/sessions</code> - User sessions</p>
             <p><code>GET /debug/users/{user_id}/messages</code> - User messages</p>
             <p><code>GET /debug/users/{user_id}/memories</code> - User memories</p>
-            <p><code>GET /debug/users/{user_id}/learning-stats</code> - Learning progress</p>
+            <p><code>GET /debug/users/{user_id}/learning-stats</code> - Comprehensive learning analysis (CEFR + technical)</p>
         </div>
 
         <div class="endpoint">
@@ -407,10 +433,11 @@ async def debug_dashboard():
         </div>
 
         <div class="stats">
-            <h2>🎯 Simplified for Production</h2>
+            <h2>🎯 Enhanced for Production</h2>
             <p>✅ <strong>Essential Memory System:</strong> Users, sessions, messages, vector store</p>
-            <p>✅ <strong>Learning Progress:</strong> Simple vocabulary and grammar tracking</p>
-            <p>✅ <strong>Real-time Testing:</strong> Ready for real user interactions</p>
+            <p>✅ <strong>Curriculum-Based Learning:</strong> CEFR levels, competencies, adaptive recommendations</p>
+            <p>✅ <strong>Technical Tracking:</strong> Vocabulary normalization, frequency analysis, statistics</p>
+            <p>✅ <strong>Educational Intelligence:</strong> Curriculum mastery analysis and personalized guidance</p>
             <p>🚀 <strong>Performance:</strong> ~9 seconds per message processing</p>
         </div>
     </body>
