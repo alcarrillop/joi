@@ -189,6 +189,30 @@ EXCLUDED_WORDS = {
     "nope",
     "hmm",
     "uhm",
+    # Technical/system words that shouldn't count as vocabulary
+    "image",
+    "analysi",  # Common misnormalization
+    "photo",
+    "attachment",
+    "file",
+    "upload",
+    "download",
+    "app",
+    "bot",
+    "system",
+    "error",
+    "message",
+    "text",
+    "emoji",
+    "gif",
+    "jpg",
+    "png",
+    "pdf",
+    "url",
+    "link",
+    "email",
+    "username",
+    "password",
 }
 
 # Stop words (not useful for tracking)
