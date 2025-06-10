@@ -1,3 +1,4 @@
+import logging
 import re
 from functools import lru_cache
 
@@ -10,6 +11,8 @@ from agent.modules.image.text_to_image import TextToImage
 from agent.modules.learning.learning_stats_manager import get_learning_stats_manager
 from agent.modules.speech.text_to_speech import TextToSpeech
 from agent.settings import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 def get_chat_model(temperature=None):
@@ -51,27 +54,31 @@ class AsteriskRemovalParser(StrOutputParser):
 
 
 async def get_user_level_info(user_id: str) -> str:
-    """Get user's English level information for conversation context."""
+    """Get user's English level information with curriculum-based insights."""
     try:
         curriculum_manager = get_curriculum_manager()
         learning_manager = get_learning_stats_manager()
 
-        # Get level progress from curriculum manager
+        # Get comprehensive level progress from enhanced curriculum manager
         level_progress = await curriculum_manager.estimate_level_progress(user_id)
 
         if "error" in level_progress:
             return "I don't have enough information about your English level yet. Keep chatting with me so I can assess your vocabulary!"
 
-        # Get enhanced vocabulary statistics
-        vocab_summary = await learning_manager.get_learning_summary(user_id)
+        # Get basic vocabulary statistics from learning manager
         top_words = await learning_manager.get_user_top_words(user_id, limit=3)
 
         level = level_progress.get("estimated_level", "A1")
-        vocab_count = vocab_summary["vocabulary"]["total_words_learned"]
+        vocab_count = level_progress.get("vocabulary_learned", 0)
         next_level = level_progress.get("next_level")
         words_needed = level_progress.get("words_needed_for_next_level", 0)
         progress_percent = level_progress.get("progress_to_next_level", 0)
         message_count = level_progress.get("total_messages", 0)
+
+        # Get curriculum insights
+        curriculum_insights = level_progress.get("curriculum_insights", {})
+        recommendations = level_progress.get("educational_recommendations", [])
+        competencies = level_progress.get("level_competencies", [])
 
         level_description = {
             "A1": "Beginner - You're just starting your English journey!",
@@ -89,6 +96,11 @@ async def get_user_level_info(user_id: str) -> str:
         response += f"📚 **Vocabulary Learned:** {vocab_count} English words\n"
         response += f"💬 **Interactions:** {message_count} messages exchanged\n\n"
 
+        # Add curriculum mastery information
+        if curriculum_insights:
+            mastery = curriculum_insights.get("curriculum_mastery_percentage", 0)
+            response += f"🎓 **Curriculum Mastery:** {mastery:.0f}% of {level} vocabulary\n\n"
+
         # Add top words with frequencies
         if top_words:
             response += "🔥 **Your Most Used Words:**\n"
@@ -96,19 +108,17 @@ async def get_user_level_info(user_id: str) -> str:
                 response += f"   • {word_data['word']} ({word_data['frequency']} times)\n"
             response += "\n"
 
+        # Progress tracking
         if next_level and words_needed > 0:
-            # Calculate progress within current level instead of confusing "progress to next"
             current_threshold = level_progress.get("current_level_threshold", 0)
             previous_threshold = level_progress.get("previous_level_threshold", 0)
 
-            # Progress within current level
             if current_threshold > previous_threshold:
                 level_progress_percent = (
                     (vocab_count - previous_threshold) / (current_threshold - previous_threshold)
                 ) * 100
                 level_progress_percent = min(100, max(0, level_progress_percent))
 
-                # Check if they've completed their current level
                 if vocab_count >= current_threshold:
                     response += f"🚀 **Next Goal:** Reach {next_level} level\n"
                     response += f"📈 **Progress:** Ready to advance! You've completed {level}\n"
@@ -127,6 +137,20 @@ async def get_user_level_info(user_id: str) -> str:
         elif vocab_count >= 600:
             response += "🏆 **Congratulations!** You're at an advanced level!\n\n"
 
+        # Add educational recommendations from curriculum
+        if recommendations:
+            response += "💡 **Learning Recommendations:**\n"
+            for rec in recommendations[:2]:  # Limit to top 2
+                response += f"   • {rec}\n"
+            response += "\n"
+
+        # Add current level focus areas
+        if competencies:
+            response += f"📖 **Current {level} Focus Areas:**\n"
+            for comp in competencies:
+                response += f"   • {comp['name']} ({comp['skill_type']})\n"
+            response += "\n"
+
         # Add encouraging context based on level
         if vocab_count < 25:
             response += "Keep chatting with me! Every interaction teaches you new words. 🌱"
@@ -139,5 +163,6 @@ async def get_user_level_info(user_id: str) -> str:
 
         return response
 
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error getting user level info: {e}")
         return "I'm having trouble accessing your learning progress right now, but I can see you're actively learning! Keep practicing and I'll help you improve! 🚀"

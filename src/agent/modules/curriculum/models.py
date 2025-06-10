@@ -1,11 +1,11 @@
 """
-Simplified data models for vocabulary-focused learning progression
+Complete data models for structured curriculum and learning progression
 """
 
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 
 class CEFRLevel(Enum):
@@ -17,6 +17,35 @@ class CEFRLevel(Enum):
     B2 = "B2"  # Upper Intermediate
     C1 = "C1"  # Advanced
     C2 = "C2"  # Proficient
+
+
+class SkillType(Enum):
+    """Core language skill types"""
+
+    SPEAKING = "speaking"
+    LISTENING = "listening"
+    READING = "reading"
+    WRITING = "writing"
+    VOCABULARY = "vocabulary"
+    GRAMMAR = "grammar"
+    PRONUNCIATION = "pronunciation"
+
+
+class CompetencyType(Enum):
+    """Types of language competencies"""
+
+    INTRODUCTIONS = "introductions"
+    BASIC_VOCABULARY = "basic_vocabulary"
+    PRESENT_SIMPLE = "present_simple"
+    FAMILY_VOCABULARY = "family_vocabulary"
+    DAILY_ROUTINES = "daily_routines"
+    FOOD_VOCABULARY = "food_vocabulary"
+    PAST_SIMPLE = "past_simple"
+    FUTURE_PLANS = "future_plans"
+    COMPARATIVES = "comparatives"
+    PRESENT_PERFECT = "present_perfect"
+    CONDITIONALS = "conditionals"
+    ADVANCED_VOCABULARY = "advanced_vocabulary"
 
 
 @dataclass
@@ -41,6 +70,49 @@ class LevelThresholds:
     B2: int = 400
     C1: int = 600
     C2: int = 800
+
+
+@dataclass
+class Competency:
+    """Individual learning competency with detailed structure"""
+
+    id: str
+    name: str
+    description: str
+    level: CEFRLevel
+    skill_type: SkillType
+    competency_type: CompetencyType
+    learning_objectives: List[str] = field(default_factory=list)
+    key_vocabulary: List[str] = field(default_factory=list)
+    grammar_points: List[str] = field(default_factory=list)
+    practice_activities: List[str] = field(default_factory=list)
+    assessment_criteria: List[str] = field(default_factory=list)
+    prerequisites: List[str] = field(default_factory=list)
+    estimated_hours: int = 1
+
+
+@dataclass
+class LearningModule:
+    """Collection of related competencies"""
+
+    id: str
+    name: str
+    description: str
+    level: CEFRLevel
+    competencies: List[str] = field(default_factory=list)  # Competency IDs
+    estimated_total_hours: int = 0
+
+
+@dataclass
+class LevelTransitionCriteria:
+    """Criteria for advancing between CEFR levels"""
+
+    from_level: CEFRLevel
+    to_level: CEFRLevel
+    min_vocabulary_words: int
+    min_competencies_completed: int
+    required_competency_types: List[CompetencyType] = field(default_factory=list)
+    min_practice_hours: int = 0
 
 
 @dataclass
