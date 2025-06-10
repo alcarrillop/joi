@@ -95,43 +95,8 @@ async def conversation_node(state: AICompanionState, config: RunnableConfig):
 
     workflow_logger.debug(f"[CONVERSATION] Memory context length for user {user_id}: {len(memory_context)} chars")
 
-    # Check if user is asking about their English level or vocabulary progress
-    last_human_message = None
-    for msg in reversed(state["messages"]):
-        if msg.type == "human":
-            last_human_message = msg
-            break
-
-    level_keywords = ["level", "assessment", "progress", "how good", "evaluate", "skill", "current level"]
-    english_keywords = ["english", "my english"]
-    vocab_keywords = ["words", "vocabulary", "vocab", "learned", "learning", "how many words"]
-
-    if last_human_message:
-        message_lower = last_human_message.content.lower()
-
-        # Don't trigger level assessment if this message contains image analysis
-        has_image_analysis = "[image analysis:" in message_lower
-
-        # Check for level-related questions
-        is_level_question = any(keyword in message_lower for keyword in level_keywords) and any(
-            keyword in message_lower for keyword in english_keywords
-        )
-
-        # Check for vocabulary-related questions
-        is_vocab_question = any(keyword in message_lower for keyword in vocab_keywords) and (
-            "learned" in message_lower or "learning" in message_lower or "many" in message_lower
-        )
-
-        # Only trigger level assessment if it's actually a level/vocab question AND not an image message
-        if (is_level_question or is_vocab_question) and not has_image_analysis:
-            # User is asking about their English level or vocabulary progress
-            try:
-                level_info = await get_user_level_info(user_id)
-                workflow_logger.info(f"[CONVERSATION] Provided curriculum-based level assessment for user {user_id}")
-                return {"messages": AIMessage(content=level_info)}
-            except Exception as e:
-                workflow_logger.warning(f"[CONVERSATION] Failed to get level info for user {user_id}: {e}")
-                # Fall through to normal conversation
+    # Progress queries are now handled by progress_query_node
+    # This node focuses on normal conversation
 
     chain = get_character_response_chain(state.get("summary", ""))
 
@@ -283,6 +248,58 @@ async def learning_stats_update_node(state: AICompanionState):
         return {"learning_stats_error": str(e)}
 
 
+async def progress_query_node(state: AICompanionState):
+    """Handle user progress and learning statistics queries."""
+    user_id = state.get("user_id", "unknown")
+    workflow_logger.info(f"[PROGRESS_QUERY] Processing progress query for user {user_id}")
+
+    if not user_id or user_id == "unknown":
+        workflow_logger.warning("[PROGRESS_QUERY] Missing user ID for progress query")
+        return {
+            "messages": AIMessage(
+                content="I need to know who you are to check your progress. Please share your information first."
+            )
+        }
+
+    # Get the last human message to analyze query type
+    last_human_message = None
+    for msg in reversed(state["messages"]):
+        if msg.type == "human":
+            last_human_message = msg
+            break
+
+    if not last_human_message:
+        workflow_logger.warning(f"[PROGRESS_QUERY] No human message found for user {user_id}")
+        return {
+            "messages": AIMessage(
+                content="I couldn't find your question. Could you ask again about your English progress?"
+            )
+        }
+
+    message_lower = last_human_message.content.lower()
+
+    # Don't trigger for image analysis messages
+    if "[image analysis:" in message_lower:
+        workflow_logger.debug(f"[PROGRESS_QUERY] Skipping image analysis message for user {user_id}")
+        # Fallback to conversation
+        return await conversation_node(state, None)
+
+    try:
+        # Get comprehensive progress information
+        level_info = await get_user_level_info(user_id)
+        workflow_logger.info(f"[PROGRESS_QUERY] Generated progress response for user {user_id}")
+        return {"messages": AIMessage(content=level_info)}
+
+    except Exception as e:
+        workflow_logger.error(f"[PROGRESS_QUERY] Failed to get progress info for user {user_id}: {e}")
+        # Fallback response
+        error_response = (
+            "I'm having trouble accessing your progress data right now. "
+            "Please try asking again in a moment, or feel free to continue our conversation!"
+        )
+        return {"messages": AIMessage(content=error_response)}
+
+
 async def router(state: AICompanionState) -> AICompanionState:
     """Route messages based on conversation context and recent interactions."""
     workflow_logger.info("Router node: Analyzing conversation flow")
@@ -367,45 +384,8 @@ async def conversation(state: AICompanionState) -> AICompanionState:
     user_id = state.get("user_id", "unknown")
     memory_context = state.get("memory_context", "")
 
-    # Check if user is asking about their English level or vocabulary progress
-    last_human_message = None
-    for msg in reversed(state["messages"]):
-        if msg.type == "human":
-            last_human_message = msg
-            break
-
-    level_keywords = ["level", "assessment", "progress", "how good", "evaluate", "skill", "current level"]
-    english_keywords = ["english", "my english"]
-    vocab_keywords = ["words", "vocabulary", "vocab", "learned", "learning", "how many words"]
-
-    if last_human_message:
-        message_lower = last_human_message.content.lower()
-
-        # Don't trigger level assessment if this message contains image analysis
-        has_image_analysis = "[image analysis:" in message_lower
-
-        # Check for level-related questions
-        is_level_question = any(keyword in message_lower for keyword in level_keywords) and any(
-            keyword in message_lower for keyword in english_keywords
-        )
-
-        # Check for vocabulary-related questions
-        is_vocab_question = any(keyword in message_lower for keyword in vocab_keywords) and (
-            "learned" in message_lower or "learning" in message_lower or "many" in message_lower
-        )
-
-        # Only trigger level assessment if it's actually a level/vocab question AND not an image message
-        if (is_level_question or is_vocab_question) and not has_image_analysis:
-            # User is asking about their English level or vocabulary progress
-            try:
-                level_info = await get_user_level_info(user_id)
-                ai_message = AIMessage(content=level_info)
-                state["messages"].append(ai_message)
-                workflow_logger.info("Provided curriculum-based level assessment")
-                return state
-            except Exception as e:
-                workflow_logger.warning(f"Failed to get level info: {e}")
-                # Fall through to normal conversation
+    # Progress queries are now handled by progress_query_node
+    # This function focuses on normal conversation
 
     # Create conversation LLM
     settings = get_settings()

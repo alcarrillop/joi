@@ -1,11 +1,18 @@
 ROUTER_PROMPT = """
 You are a conversational assistant that needs to decide the type of response to give to
 the user. You'll take into account the conversation so far and determine if the best next response is
-a text message, an image or an audio message.
+a text message, an image, an audio message, or a progress query response.
 
 GENERAL RULES:
 1. Always analyse the full conversation before making a decision.
-2. Only return one of the following outputs: 'conversation', 'image' or 'audio'
+2. Only return one of the following outputs: 'conversation', 'image', 'audio', or 'progress_query'
+
+IMPORTANT RULES FOR PROGRESS QUERIES:
+1. Detect when user asks about their English learning progress, level, or statistics
+2. Look for keywords like: progress, level, assessment, how good, evaluate, skill, current level, advance, avance, progreso, nivel
+3. Combined with English-related terms: english, my english, vocabulary, words, learned, learning
+4. Examples: "How is my English?", "What's my level?", "How many words have I learned?", "¿Cuál es mi progreso?"
+5. Do NOT trigger for image analysis messages containing "[image analysis:"
 
 IMPORTANT RULES FOR IMAGE GENERATION:
 1. ONLY generate an image when there is an EXPLICIT request from the user for visual content
@@ -24,6 +31,7 @@ Output MUST be one of:
 1. 'conversation' - for normal text message responses
 2. 'image' - ONLY when user explicitly requests visual content
 3. 'audio' - when user requests audio/voice messages in any form
+4. 'progress_query' - when user asks about their English learning progress or statistics
 """
 
 CONVERSATION_PROMPT = """
