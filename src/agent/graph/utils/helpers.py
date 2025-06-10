@@ -5,7 +5,6 @@ from functools import lru_cache
 from langchain_core.output_parsers import StrOutputParser
 from langchain_groq import ChatGroq
 
-from agent.modules.curriculum.curriculum_manager import get_curriculum_manager
 from agent.modules.image.image_to_text import ImageToText
 from agent.modules.image.text_to_image import TextToImage
 from agent.modules.learning.learning_stats_manager import get_learning_stats_manager
@@ -56,29 +55,23 @@ class AsteriskRemovalParser(StrOutputParser):
 async def get_user_level_info(user_id: str) -> str:
     """Get user's English level information with curriculum-based insights."""
     try:
-        curriculum_manager = get_curriculum_manager()
         learning_manager = get_learning_stats_manager()
 
-        # Get comprehensive level progress from enhanced curriculum manager
-        level_progress = await curriculum_manager.estimate_level_progress(user_id)
-
-        if "error" in level_progress:
-            return "I don't have enough information about your English level yet. Keep chatting with me so I can assess your vocabulary!"
-
         # Get basic vocabulary statistics from learning manager
+        vocab_count = await learning_manager.get_vocabulary_word_count(user_id)
         top_words = await learning_manager.get_user_top_words(user_id, limit=3)
 
-        level = level_progress.get("estimated_level", "A1")
-        vocab_count = level_progress.get("vocabulary_learned", 0)
-        next_level = level_progress.get("next_level")
-        words_needed = level_progress.get("words_needed_for_next_level", 0)
-        progress_percent = level_progress.get("progress_to_next_level", 0)
-        message_count = level_progress.get("total_messages", 0)
-
-        # Get curriculum insights
-        curriculum_insights = level_progress.get("curriculum_insights", {})
-        recommendations = level_progress.get("educational_recommendations", [])
-        competencies = level_progress.get("level_competencies", [])
+        # Simple level estimation based on vocabulary count
+        if vocab_count >= 400:
+            level = "C1"
+        elif vocab_count >= 250:
+            level = "B2"
+        elif vocab_count >= 150:
+            level = "B1"
+        elif vocab_count >= 75:
+            level = "A2"
+        else:
+            level = "A1"
 
         level_description = {
             "A1": "Beginner - You're just starting your English journey!",
@@ -93,13 +86,7 @@ async def get_user_level_info(user_id: str) -> str:
 
         response = "📊 **Your English Learning Progress** 📊\n\n"
         response += f"🎯 **Current Level:** {level} ({description})\n\n"
-        response += f"📚 **Vocabulary Learned:** {vocab_count} English words\n"
-        response += f"💬 **Interactions:** {message_count} messages exchanged\n\n"
-
-        # Add curriculum mastery information
-        if curriculum_insights:
-            mastery = curriculum_insights.get("curriculum_mastery_percentage", 0)
-            response += f"🎓 **Curriculum Mastery:** {mastery:.0f}% of {level} vocabulary\n\n"
+        response += f"📚 **Vocabulary Learned:** {vocab_count} English words\n\n"
 
         # Add top words with frequencies
         if top_words:
@@ -108,48 +95,36 @@ async def get_user_level_info(user_id: str) -> str:
                 response += f"   • {word_data['word']} ({word_data['frequency']} times)\n"
             response += "\n"
 
-        # Progress tracking
-        if next_level and words_needed > 0:
-            current_threshold = level_progress.get("current_level_threshold", 0)
-            previous_threshold = level_progress.get("previous_level_threshold", 0)
+        # Simple progress tracking
+        level_thresholds = {
+            "A1": 75,
+            "A2": 150,
+            "B1": 250,
+            "B2": 400,
+            "C1": 600,
+            "C2": 800,
+        }
 
-            if current_threshold > previous_threshold:
-                level_progress_percent = (
-                    (vocab_count - previous_threshold) / (current_threshold - previous_threshold)
-                ) * 100
-                level_progress_percent = min(100, max(0, level_progress_percent))
+        current_threshold = level_thresholds.get(level, 0)
+        levels = ["A1", "A2", "B1", "B2", "C1", "C2"]
 
-                if vocab_count >= current_threshold:
-                    response += f"🚀 **Next Goal:** Reach {next_level} level\n"
-                    response += f"📈 **Progress:** Ready to advance! You've completed {level}\n"
-                    response += f"🎯 **Words for {next_level}:** {words_needed} more vocabulary words\n\n"
-                else:
-                    words_to_complete_current = current_threshold - vocab_count
-                    response += f"🚀 **Current Goal:** Complete {level} level\n"
-                    response += f"📈 **Progress in {level}:** {level_progress_percent:.1f}% complete\n"
-                    response += (
-                        f"🎯 **Words to complete {level}:** {words_to_complete_current} more vocabulary words\n\n"
-                    )
-            else:
+        try:
+            current_index = levels.index(level)
+            next_level = levels[current_index + 1] if current_index < len(levels) - 1 else None
+        except ValueError:
+            next_level = None
+
+        if next_level:
+            next_threshold = level_thresholds.get(next_level, current_threshold)
+            words_needed = max(0, next_threshold - vocab_count)
+
+            if words_needed > 0:
                 response += f"🚀 **Next Goal:** Reach {next_level} level\n"
-                response += f"📈 **Progress:** {progress_percent:.1f}% to {next_level}\n"
                 response += f"🎯 **Words Needed:** {words_needed} more vocabulary words\n\n"
+            else:
+                response += f"🎉 **Ready to advance to {next_level}!**\n\n"
         elif vocab_count >= 600:
             response += "🏆 **Congratulations!** You're at an advanced level!\n\n"
-
-        # Add educational recommendations from curriculum
-        if recommendations:
-            response += "💡 **Learning Recommendations:**\n"
-            for rec in recommendations[:2]:  # Limit to top 2
-                response += f"   • {rec}\n"
-            response += "\n"
-
-        # Add current level focus areas
-        if competencies:
-            response += f"📖 **Current {level} Focus Areas:**\n"
-            for comp in competencies:
-                response += f"   • {comp['name']} ({comp['skill_type']})\n"
-            response += "\n"
 
         # Add encouraging context based on level
         if vocab_count < 25:

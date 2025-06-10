@@ -41,8 +41,8 @@ class SimpleCurriculumManager:
             vocabulary.extend(comp.key_vocabulary)
         return set(vocabulary)
 
-    def estimate_level_progress(self, user_id: str) -> Dict:
-        """Simple level estimation."""
+    async def estimate_level_progress(self, user_id: str) -> Dict:
+        """Simple level estimation - kept async for API compatibility."""
         return {
             "estimated_level": "A1",
             "vocabulary_learned": 0,

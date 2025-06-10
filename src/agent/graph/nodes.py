@@ -230,7 +230,7 @@ async def learning_stats_update_node(state: AICompanionState):
         )
 
         workflow_logger.info(
-            f"[LEARNING_STATS] Updated stats for user {user_id}: {stats_update.get('vocabulary_analysis', {}).get('new_words_found', 0)} new words"
+            f"[LEARNING_STATS] Updated stats for user {user_id}: {stats_update.get('words_processed', 0)} new words"
         )
 
         return {"learning_stats_update": stats_update}

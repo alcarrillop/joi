@@ -17,8 +17,7 @@ async def test_terminology_consistency():
     # Get the source code of the function
     source = inspect.getsource(get_user_level_info)
 
-    # Check that we use "Interactions" not "Conversations" in stats
-    assert "**Interactions:**" in source, "Should use 'Interactions' in stats display"
+    # Check terminology consistency (simplified version doesn't show interactions count)
     assert "**Conversations:**" not in source, "Should not use 'Conversations' in stats display"
 
     # Check that motivational messages use "interaction" not "conversation"
@@ -35,12 +34,11 @@ async def test_progress_display_elements():
 
     source = inspect.getsource(get_user_level_info)
 
-    # Check for expected UI elements in progress display
+    # Check for expected UI elements in progress display (simplified version)
     expected_elements = [
         "**Your English Learning Progress**",
         "**Current Level:**",
         "**Vocabulary Learned:**",
-        "**Interactions:**",
         "**Your Most Used Words:**",
         "Keep chatting with me!",
     ]
@@ -58,15 +56,13 @@ async def test_emoji_usage():
 
     source = inspect.getsource(get_user_level_info)
 
-    # Check for consistent emoji usage
+    # Check for consistent emoji usage (simplified version)
     expected_emojis = [
         "📊",  # Progress stats
         "🎯",  # Current level/goal
         "📚",  # Vocabulary
-        "💬",  # Interactions
         "🔥",  # Most used words
         "🚀",  # Goals/advancement
-        "📈",  # Progress tracking
     ]
 
     for emoji in expected_emojis:
@@ -129,11 +125,11 @@ async def test_progress_calculation_messaging():
 
     source = inspect.getsource(get_user_level_info)
 
-    # Check for clear progress messaging
-    progress_terms = ["Progress in", "complete", "Words to complete", "more vocabulary words", "Ready to advance"]
+    # Check for clear progress messaging (simplified version)
+    progress_terms = ["more vocabulary words", "Ready to advance"]
 
     for term in progress_terms:
         assert term in source, f"Missing progress term: {term}"
 
-    # Ensure we show progress within current level, not confusing "progress to next"
-    assert "Progress in" in source, "Should show progress within current level"
+    # Check that we show clear goal messaging
+    assert "**Next Goal:**" in source, "Should show next goal clearly"
