@@ -82,7 +82,7 @@ async def test_database_connection():
 async def load_routers():
     """Load routers on startup to avoid import-time dependency issues."""
     try:
-        # from agent.interfaces.debug.debug_endpoints import debug_router  # Temporarily disabled for migration
+        # Debug endpoints removed for simplicity
         from agent.interfaces.whatsapp.whatsapp_response import whatsapp_router
 
         app.include_router(whatsapp_router)

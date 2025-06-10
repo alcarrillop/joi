@@ -178,15 +178,10 @@ async def test_learning_manager_summary_structure():
         # Get summary
         summary = await manager.get_learning_summary(test_user_id)
 
-        # Summary should be either a string or dict with expected keys
-        if isinstance(summary, dict):
-            expected_keys = ["vocabulary", "statistics"]
-            for key in expected_keys:
-                assert key in summary, f"Missing key {key} in summary"
-        else:
-            # If it's a string, should contain learning info
-            assert isinstance(summary, str)
-            assert len(summary) > 0
+        # Summary should be a dict with simplified structure
+        assert isinstance(summary, dict)
+        assert "vocabulary" in summary
+        assert "success" in summary
 
 
 @pytest.mark.asyncio
